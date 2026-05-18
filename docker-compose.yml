@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: openboard-ai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openboard_ai
+      POSTGRES_PASSWORD: openboard_ai
+      POSTGRES_DB: openboard_ai
+    ports:
+      - "5436:5432"
+    volumes:
+      - openboard-ai-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openboard_ai -d openboard_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  openboard-ai-pgdata:

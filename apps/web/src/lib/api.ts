@@ -1,0 +1,45 @@
+import type { BoardResponse } from '@openboard-ai/shared'
+
+async function json<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${body}`)
+  }
+  return res.json() as Promise<T>
+}
+
+export type ValidateKeyResponse =
+  | { valid: true; credits?: number }
+  | { valid: false; reason: 'unauthorized' | 'network' | 'timeout' | 'upstream' | 'bad-request' }
+
+export const api = {
+  createBoard: (title?: string) =>
+    fetch('/api/boards', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    }).then((r) => json<BoardResponse>(r)),
+
+  getBoard: (id: string) => fetch(`/api/boards/${id}`).then((r) => json<BoardResponse>(r)),
+
+  saveSnapshot: (id: string, snapshot: Record<string, unknown>) =>
+    fetch(`/api/boards/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ snapshot }),
+    }).then((r) => json<BoardResponse>(r)),
+
+  validateKey: async (key: string): Promise<ValidateKeyResponse> => {
+    try {
+      const res = await fetch('/api/settings/validate-key', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key }),
+      })
+      if (!res.ok) return { valid: false, reason: 'network' }
+      return (await res.json()) as ValidateKeyResponse
+    } catch {
+      return { valid: false, reason: 'network' }
+    }
+  },
+}
