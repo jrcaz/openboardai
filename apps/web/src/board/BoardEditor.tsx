@@ -138,7 +138,7 @@ export function BoardEditor({ boardId }: Props) {
         snapshot={initialSnapshotRef.current ?? undefined}
         onMount={handleMount}
       />
-      <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-40 flex items-center gap-2">
+      <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
         <SettingsButton />
         <PresentationToggle

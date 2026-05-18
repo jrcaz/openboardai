@@ -26,6 +26,7 @@ export type AiImageShape = TLBaseShape<
   }
 >
 
+// @ts-expect-error tldraw 4.5+ narrowed TLBaseBoxShape to a closed union of built-in shapes; custom shape types are no longer accepted as generic args.
 export class AiImageShapeUtil extends BaseBoxShapeUtil<AiImageShape> {
   static override type = AI_IMAGE_TYPE
   static override props: RecordProps<AiImageShape> = {

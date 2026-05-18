@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 import { type Editor, createShapeId, type TLShape, type TLShapeId } from 'tldraw'
 import type { AiContextShape, ChatMessage, GenerateRequest } from '@openboard-ai/shared'
 import { AI_CARD_TYPE, type AiCardShape } from '../shapes/AiCardShapeUtil'
+import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import { createConnectingArrow, extractImageRef, extractShapeText, pickAnchor } from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
 
@@ -47,7 +48,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       const sourceIds = contextShapes.map((s) => s.id as string)
 
       editor.run(() => {
-        editor.createShape<AiCardShape>({
+        createCustomShape<AiCardShape>(editor, {
           id: cardId,
           type: AI_CARD_TYPE,
           x: anchor.x,
@@ -120,13 +121,12 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
           editor.run(
             () => {
-              editor.updateShape<AiCardShape>({
+              updateCustomShape<AiCardShape>(editor, {
                 id: cardId,
                 type: AI_CARD_TYPE,
                 props: {
                   text: acc,
                   status: 'streaming',
-                  // Auto-grow height while streaming, capped.
                   h: Math.min(800, Math.max(h, estimateHeight(acc, w))),
                 },
               })
@@ -139,7 +139,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
         editor.run(
           () => {
-            editor.updateShape<AiCardShape>({
+            updateCustomShape<AiCardShape>(editor, {
               id: cardId,
               type: AI_CARD_TYPE,
               props: { text: acc, status: 'done' },
@@ -153,7 +153,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
         console.error('[ai] generate failed', err)
         editor.run(
           () => {
-            editor.updateShape<AiCardShape>({
+            updateCustomShape<AiCardShape>(editor, {
               id: cardId,
               type: AI_CARD_TYPE,
               props: { status: 'error' },

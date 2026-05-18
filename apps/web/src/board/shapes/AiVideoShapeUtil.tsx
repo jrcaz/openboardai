@@ -31,6 +31,7 @@ export type AiVideoShape = TLBaseShape<
   }
 >
 
+// @ts-expect-error tldraw 4.5+ narrowed TLBaseBoxShape to a closed union of built-in shapes; custom shape types are no longer accepted as generic args.
 export class AiVideoShapeUtil extends BaseBoxShapeUtil<AiVideoShape> {
   static override type = AI_VIDEO_TYPE
   static override props: RecordProps<AiVideoShape> = {

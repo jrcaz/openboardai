@@ -66,9 +66,10 @@ export function createConnectingArrow(editor: Editor, fromId: string, toId: TLSh
 }
 
 export function extractShapeText(editor: Editor, shape: TLShape): string {
+  const shapeType = shape.type as string
   // AI cards represent prior exchanges — include both sides so the model can
   // refer back to "what was asked" and "what was answered".
-  if (shape.type === 'ai-card') {
+  if (shapeType === 'ai-card') {
     const props = shape.props as { prompt?: string; text?: string }
     const parts: string[] = []
     if (props.prompt) parts.push(`Prior user prompt: ${props.prompt}`)
@@ -76,14 +77,14 @@ export function extractShapeText(editor: Editor, shape: TLShape): string {
     return parts.join('\n\n')
   }
   // AI images have no text content; surface the generation prompt instead.
-  if (shape.type === 'ai-image') {
+  if (shapeType === 'ai-image') {
     const props = shape.props as { prompt?: string }
     return props.prompt
       ? `[AI-generated image — prompt: "${props.prompt}"]`
       : '[AI-generated image]'
   }
   // AI videos: same idea — text-mode follow-ups can reference the prompt.
-  if (shape.type === 'ai-video') {
+  if (shapeType === 'ai-video') {
     const props = shape.props as { prompt?: string }
     return props.prompt
       ? `[AI-generated video — prompt: "${props.prompt}"]`
@@ -113,7 +114,8 @@ export function extractImageRef(
   editor: Editor,
   shape: TLShape,
 ): { imageId?: string; dataUrl?: string; mediaType?: string } | undefined {
-  if (shape.type === 'ai-image') {
+  const shapeType = shape.type as string
+  if (shapeType === 'ai-image') {
     const props = shape.props as { imageId?: string | null; mediaType?: string | null }
     if (!props.imageId) return undefined
     return {
@@ -121,7 +123,7 @@ export function extractImageRef(
       ...(props.mediaType ? { mediaType: props.mediaType } : {}),
     }
   }
-  if (shape.type === 'image') {
+  if (shapeType === 'image') {
     const props = shape.props as { assetId?: TLAssetId | null }
     if (!props.assetId) return undefined
     const asset = editor.getAsset(props.assetId)

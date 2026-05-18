@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api, type ValidateKeyResponse } from '../lib/api'
 import { useApiKey } from './useApiKey'
 
@@ -116,10 +117,10 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
     onClose?.()
   }
 
-  return (
+  return createPortal(
     <div
       onClick={onBackdropClick}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-950/40 backdrop-blur-md p-4"
+      className="pointer-events-auto fixed inset-0 z-[600] flex items-center justify-center bg-neutral-950/40 backdrop-blur-md p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby={`${inputId}-title`}
@@ -294,6 +295,7 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
           Your key never leaves your browser except to call OpenRouter through this app's server. We don't store or log it.
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

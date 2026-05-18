@@ -10,6 +10,7 @@ import {
   type TLBaseShape,
   stopEventPropagation,
 } from 'tldraw'
+import { updateCustomShape } from './customShape'
 
 export const AI_CARD_TYPE = 'ai-card' as const
 
@@ -25,6 +26,7 @@ export type AiCardShape = TLBaseShape<
   }
 >
 
+// @ts-expect-error tldraw 4.5+ narrowed TLBaseBoxShape to a closed union of built-in shapes; custom shape types are no longer accepted as generic args.
 export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
   static override type = AI_CARD_TYPE
   static override props: RecordProps<AiCardShape> = {
@@ -75,7 +77,7 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
       raf = requestAnimationFrame(() => {
         const measured = Math.ceil(el.scrollHeight)
         if (measured > h + 1) {
-          editor.updateShape<AiCardShape>({
+          updateCustomShape<AiCardShape>(editor, {
             id: shape.id,
             type: AI_CARD_TYPE,
             props: { h: measured },

@@ -6,6 +6,7 @@ import type {
   VideoAspect,
 } from '@openboard-ai/shared'
 import { AI_VIDEO_TYPE, type AiVideoShape } from '../shapes/AiVideoShapeUtil'
+import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import { createConnectingArrow, pickAnchor } from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
 
@@ -47,7 +48,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
 
       if (reuseShapeId) {
         editor.run(() => {
-          editor.updateShape<AiVideoShape>({
+          updateCustomShape<AiVideoShape>(editor, {
             id: reuseShapeId,
             type: AI_VIDEO_TYPE,
             props: {
@@ -65,7 +66,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
       } else {
         const anchor = pickAnchor(editor, contextShapes, dims.w)
         editor.run(() => {
-          editor.createShape<AiVideoShape>({
+          createCustomShape<AiVideoShape>(editor, {
             id: shapeId,
             type: AI_VIDEO_TYPE,
             x: anchor.x,
@@ -123,7 +124,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
 
         editor.run(
           () => {
-            editor.updateShape<AiVideoShape>({
+            updateCustomShape<AiVideoShape>(editor, {
               id: shapeId,
               type: AI_VIDEO_TYPE,
               props: {
@@ -143,7 +144,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
         const message = err instanceof Error ? err.message : 'Generation failed'
         editor.run(
           () => {
-            editor.updateShape<AiVideoShape>({
+            updateCustomShape<AiVideoShape>(editor, {
               id: shapeId,
               type: AI_VIDEO_TYPE,
               props: { status: 'error', errorMessage: message },

@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { type Editor, createShapeId, type TLShape, type TLShapeId } from 'tldraw'
 import type { GenerateImageRequest, GenerateImageResponse, ImageAspect } from '@openboard-ai/shared'
 import { AI_IMAGE_TYPE, type AiImageShape } from '../shapes/AiImageShapeUtil'
+import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import { createConnectingArrow, pickAnchor } from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
 
@@ -39,7 +40,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
       if (reuseShapeId) {
         // Reset existing shape (Retry flow): back to generating state.
         editor.run(() => {
-          editor.updateShape<AiImageShape>({
+          updateCustomShape<AiImageShape>(editor, {
             id: reuseShapeId,
             type: AI_IMAGE_TYPE,
             props: {
@@ -54,7 +55,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
       } else {
         const anchor = pickAnchor(editor, contextShapes, dims.w)
         editor.run(() => {
-          editor.createShape<AiImageShape>({
+          createCustomShape<AiImageShape>(editor, {
             id: shapeId,
             type: AI_IMAGE_TYPE,
             x: anchor.x,
@@ -107,7 +108,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
 
         editor.run(
           () => {
-            editor.updateShape<AiImageShape>({
+            updateCustomShape<AiImageShape>(editor, {
               id: shapeId,
               type: AI_IMAGE_TYPE,
               props: {
@@ -126,7 +127,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
         const message = err instanceof Error ? err.message : 'Generation failed'
         editor.run(
           () => {
-            editor.updateShape<AiImageShape>({
+            updateCustomShape<AiImageShape>(editor, {
               id: shapeId,
               type: AI_IMAGE_TYPE,
               props: { status: 'error', errorMessage: message },

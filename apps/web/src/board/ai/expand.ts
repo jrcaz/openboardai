@@ -1,6 +1,7 @@
 import { type Editor, type TLShape, type TLShapeId, createShapeId } from 'tldraw'
 import type { AiContextShape, ChatMessage, GenerateRequest } from '@openboard-ai/shared'
 import { AI_CARD_TYPE, type AiCardShape } from '../shapes/AiCardShapeUtil'
+import { createCustomShape } from '../shapes/customShape'
 import { extractShapeText } from './canvas'
 
 const CHILD_W = 220
@@ -64,7 +65,7 @@ export async function extractAndExpand(editor: Editor, boardId: string, source: 
       const cy = center.y + Math.sin(a) * RADIUS - CHILD_H / 2
 
       const cardId = i === 0 ? firstCardId : createShapeId()
-      editor.createShape<AiCardShape>({
+      createCustomShape<AiCardShape>(editor, {
         id: cardId,
         type: AI_CARD_TYPE,
         x: cx,
