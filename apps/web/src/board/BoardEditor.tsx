@@ -19,6 +19,7 @@ import { SettingsButton } from '../settings/SettingsButton'
 import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
+import { FileMenu } from './FileMenu'
 
 const customShapeUtils = [AiCardShapeUtil, AiImageShapeUtil, AiVideoShapeUtil]
 
@@ -144,6 +145,7 @@ export function BoardEditor({ boardId }: Props) {
       />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
+        <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
         <SettingsButton />
         <PresentationToggle
