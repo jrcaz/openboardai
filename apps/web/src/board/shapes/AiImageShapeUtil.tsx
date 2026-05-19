@@ -72,7 +72,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
 
   const borderClass =
     status === 'generating'
-      ? 'border-violet-300'
+      ? 'border-orange-300'
       : status === 'error'
       ? 'border-red-300'
       : 'border-neutral-200'
@@ -83,7 +83,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
       style={{ pointerEvents: 'all', width: w, height: h }}
     >
       <div
-        className={`relative h-full w-full overflow-hidden rounded-2xl border ${borderClass} bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06),0_18px_38px_-18px_rgba(60,40,140,0.28)] transition-colors duration-500`}
+        className={`relative h-full w-full overflow-hidden rounded-2xl border ${borderClass} bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06),0_18px_38px_-18px_rgba(120,53,15,0.28)] transition-colors duration-500`}
       >
         {/* The image — fades in once loaded. Always mounted in done/error so swap is seamless. */}
         {status !== 'generating' && imageId && (
@@ -122,7 +122,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
 function GeneratingLayer({ prompt }: { prompt: string }) {
   return (
     <div
-      className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-hidden bg-gradient-to-br from-violet-50 via-sky-50 to-violet-50 animate-ai-image-pulse-soft"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-hidden bg-gradient-to-br from-orange-50 via-amber-50 to-orange-50 animate-ai-image-pulse-soft"
     >
       {/* Diagonal shimmer sweep */}
       <div
@@ -132,13 +132,13 @@ function GeneratingLayer({ prompt }: { prompt: string }) {
 
       {/* Center icon stack */}
       <div className="relative z-10 flex flex-col items-center gap-2.5">
-        <div className="animate-ai-image-float relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 shadow-[0_4px_18px_-6px_rgba(124,58,237,0.45)] backdrop-blur-sm">
-          <PaintbrushSparkleIcon className="h-6 w-6 text-violet-600" />
-          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-violet-500 shadow-[0_0_0_3px_rgba(255,255,255,0.85)] animate-ping" />
+        <div className="animate-ai-image-float relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 shadow-[0_4px_18px_-6px_rgba(249,115,22,0.45)] backdrop-blur-sm">
+          <PaintbrushSparkleIcon className="h-6 w-6 text-orange-600" />
+          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-orange-400 shadow-[0_0_0_3px_rgba(255,255,255,0.85)] animate-ping" />
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-700">
             Painting
           </span>
           <span className="flex items-end gap-[3px] pl-0.5">
@@ -152,7 +152,7 @@ function GeneratingLayer({ prompt }: { prompt: string }) {
       {/* Prompt caption — truncated */}
       {prompt && (
         <p
-          className="relative z-10 max-w-[80%] truncate text-center text-[11px] italic text-violet-900/60"
+          className="relative z-10 max-w-[80%] truncate text-center text-[11px] italic text-orange-900/60"
           title={prompt}
         >
           “{prompt}”
@@ -216,7 +216,7 @@ function ErrorLayer({
 function Dot({ delay }: { delay: string }) {
   return (
     <span
-      className="block h-1.5 w-1.5 rounded-full bg-violet-600 animate-ai-image-dot"
+      className="block h-1.5 w-1.5 rounded-full bg-orange-500 animate-ai-image-dot"
       style={{ animationDelay: delay }}
     />
   )

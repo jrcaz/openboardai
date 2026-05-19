@@ -21,7 +21,7 @@ export function HowItWorks() {
     <section id="how" className="py-20 sm:py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="max-w-2xl">
-          <div className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-violet-600">
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-amber-600">
             How it works
           </div>
           <h2 className="mt-3 text-[32px] font-semibold leading-tight tracking-tight text-neutral-900 sm:text-[36px]">
@@ -42,8 +42,8 @@ export function HowItWorks() {
                 {s.step}
               </div>
               <div className="relative">
-                <div className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-wider text-violet-600">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-[10px] text-white">
+                <div className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-wider text-amber-600">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-400 text-[10px] text-neutral-900">
                     {i + 1}
                   </span>
                   Step {s.step}

@@ -32,11 +32,11 @@ body,
 .ai-md del    { text-decoration: line-through; opacity: 0.7; }
 
 .ai-md a {
-  color: #6d28d9;
+  color: #b45309;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.ai-md a:hover { color: #5b21b6; }
+.ai-md a:hover { color: #92400e; }
 
 .ai-md h1, .ai-md h2, .ai-md h3, .ai-md h4 {
   font-weight: 600;
@@ -62,9 +62,9 @@ body,
 .ai-md blockquote {
   margin: 0.4em 0 0.6em;
   padding: 0.1em 0.75em;
-  border-left: 3px solid #ddd6fe;
+  border-left: 3px solid #fde68a;
   color: #4b5563;
-  background: rgba(237, 233, 254, 0.25);
+  background: rgba(254, 249, 195, 0.4);
   border-radius: 0 6px 6px 0;
 }
 
@@ -232,7 +232,7 @@ body,
   100% { background-position: 200% 0; }
 }
 .lp-shimmer-bar {
-  background: linear-gradient(90deg, #f3e8ff 0%, #fae8ff 45%, #f5d0fe 50%, #fae8ff 55%, #f3e8ff 100%);
+  background: linear-gradient(90deg, #fef9c3 0%, #fef08a 45%, #fde68a 50%, #fef08a 55%, #fef9c3 100%);
   background-size: 200% 100%;
   animation: lp-shimmer-bar 1.8s linear infinite;
 }
