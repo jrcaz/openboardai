@@ -60,6 +60,9 @@ export const GenerateRequest = z.object({
     .optional(),
   resultShapeId: z.string().optional(),
   model: z.string().min(1).max(200).optional(),
+  agentSystemPrompt: z.string().max(8000).optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().min(1).max(32000).optional(),
 })
 export type GenerateRequest = z.infer<typeof GenerateRequest>
 
@@ -147,3 +150,38 @@ export const ModelsResponse = z.object({
   cachedAt: z.number(),
 })
 export type ModelsResponse = z.infer<typeof ModelsResponse>
+
+// --- Custom sub-agents ---
+
+export const SubAgentMode = z.enum(['prompt', 'selection-qa', 'expand'])
+export type SubAgentMode = z.infer<typeof SubAgentMode>
+
+export const SubAgent = z.object({
+  id: z.string(),
+  name: z.string().trim().min(1).max(50),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9-]{1,32}$/, 'lowercase letters, digits, and dashes only'),
+  description: z.string().max(300).optional(),
+  modality: Modality,
+  systemPrompt: z.string().min(1).max(8000),
+  model: z.string().max(200).optional(),
+  defaultMode: SubAgentMode.optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().min(1).max(32000).optional(),
+  icon: z.string().max(8).optional(),
+  color: z.string().max(32).optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+})
+export type SubAgent = z.infer<typeof SubAgent>
+
+export const SubAgentsStorage = z.object({
+  agents: z.array(SubAgent),
+  activeByModality: z.object({
+    text: z.string().nullable(),
+    image: z.string().nullable(),
+    video: z.string().nullable(),
+  }),
+})
+export type SubAgentsStorage = z.infer<typeof SubAgentsStorage>

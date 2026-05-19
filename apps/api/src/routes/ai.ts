@@ -36,7 +36,17 @@ function requireOpenRouter(c: Context) {
 
 ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
-  const { messages, boardId, mode, context, resultShapeId, model } = c.req.valid('json')
+  const {
+    messages,
+    boardId,
+    mode,
+    context,
+    resultShapeId,
+    model,
+    agentSystemPrompt,
+    temperature,
+    maxTokens,
+  } = c.req.valid('json')
   const selected = model?.trim() || DEFAULTS.text
 
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
@@ -47,8 +57,10 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
 
   const result = streamText({
     model: openrouter.chat(selected),
-    system: buildSystemPrompt({ mode, context }),
+    system: buildSystemPrompt({ mode, context, agentSystemPrompt }),
     messages: llmMessages,
+    ...(typeof temperature === 'number' ? { temperature } : {}),
+    ...(typeof maxTokens === 'number' ? { maxOutputTokens: maxTokens } : {}),
     onFinish: async ({ text }) => {
       try {
         await db.insert(schema.aiMessages).values({

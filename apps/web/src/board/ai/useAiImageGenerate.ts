@@ -1,6 +1,11 @@
 import { useCallback } from 'react'
 import { type Editor, createShapeId, type TLShape, type TLShapeId } from 'tldraw'
-import type { GenerateImageRequest, GenerateImageResponse, ImageAspect } from '@openboard-ai/shared'
+import type {
+  GenerateImageRequest,
+  GenerateImageResponse,
+  ImageAspect,
+  SubAgent,
+} from '@openboard-ai/shared'
 import { AI_IMAGE_TYPE, type AiImageShape } from '../shapes/AiImageShapeUtil'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import { createConnectingArrow, pickAnchor } from './canvas'
@@ -18,6 +23,8 @@ interface GenerateImageOptions {
   connectArrows?: boolean
   /** Reuse an existing shape (used by Retry). */
   reuseShapeId?: TLShapeId
+  /** Custom sub-agent — prepends `systemPrompt` to the user prompt and overrides model. */
+  agent?: SubAgent | null
 }
 
 const CANVAS_DIMS_FOR: Record<ImageAspect, { w: number; h: number }> = {
@@ -34,10 +41,19 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
       contextShapes = [],
       connectArrows = false,
       reuseShapeId,
+      agent = null,
     }: GenerateImageOptions) => {
       if (!editor) return
-      const trimmed = prompt.trim()
-      if (!trimmed) return
+      const userPrompt = prompt.trim()
+      if (!userPrompt) return
+
+      // Image endpoints have no system message, so the agent's system prompt
+      // is folded into the prompt itself as a template prefix for the API call.
+      // The shape's `prompt` prop stays user-facing so the card caption shows
+      // what the user actually typed, not the agent template.
+      const apiPrompt = agent?.systemPrompt?.trim()
+        ? `${agent.systemPrompt.trim()}\n\n${userPrompt}`
+        : userPrompt
 
       const dims = CANVAS_DIMS_FOR[aspect]
       const shapeId = reuseShapeId ?? createShapeId()
@@ -49,7 +65,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
             id: reuseShapeId,
             type: AI_IMAGE_TYPE,
             props: {
-              prompt: trimmed,
+              prompt: userPrompt,
               status: 'generating',
               imageId: null,
               mediaType: null,
@@ -68,7 +84,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
             props: {
               w: dims.w,
               h: dims.h,
-              prompt: trimmed,
+              prompt: userPrompt,
               status: 'generating',
               imageId: null,
               mediaType: null,
@@ -86,6 +102,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
 
       try {
         const modelPref = getModelPreference('image')
+        const resolvedModel = agent?.model?.trim() || modelPref
         const res = await fetch('/api/ai/generate-image', {
           method: 'POST',
           headers: {
@@ -94,10 +111,10 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
           },
           body: JSON.stringify({
             boardId,
-            prompt: trimmed,
+            prompt: apiPrompt,
             aspect,
             resultShapeId: shapeId as string,
-            ...(modelPref ? { model: modelPref } : {}),
+            ...(resolvedModel ? { model: resolvedModel } : {}),
           } satisfies GenerateImageRequest),
         })
 

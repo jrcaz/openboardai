@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
-import type { ImageAspect, VideoAspect } from '@openboard-ai/shared'
+import type { ImageAspect, Modality, VideoAspect } from '@openboard-ai/shared'
 import { useAiGenerate } from './useAiGenerate'
 import { useAiImageGenerate } from './useAiImageGenerate'
 import { useAiVideoGenerate } from './useAiVideoGenerate'
 import { ModelPicker } from './ModelPicker'
+import { AgentPicker } from './AgentPicker'
+import { parseAgentSlash } from './parseAgentSlash'
+import { useSubAgents } from '../../settings/useSubAgents'
 
 interface Props {
   boardId: string
   editor: Editor | null
+  onOpenAgents: () => void
 }
 
 type Mode = 'text' | 'image' | 'video'
@@ -24,10 +28,11 @@ const VIDEO_ASPECTS: { value: VideoAspect; label: string; icon: 'wide' | 'tall' 
   { value: '9:16', label: 'Tall', icon: 'tall' },
 ]
 
-export function AiPromptBar({ boardId, editor }: Props) {
+export function AiPromptBar({ boardId, editor, onOpenAgents }: Props) {
   const { generate } = useAiGenerate(boardId, editor)
   const generateImage = useAiImageGenerate(boardId, editor)
   const generateVideo = useAiVideoGenerate(boardId, editor)
+  const { agents, activeAgent } = useSubAgents()
 
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
@@ -120,6 +125,15 @@ export function AiPromptBar({ boardId, editor }: Props) {
     return () => window.removeEventListener('ai-video:retry', handleRetry)
   }, [editor, generateVideo, videoAspect, generateAudio])
 
+  // Resolve the active agent for the current mode. Slash-command wins over picker.
+  const modality: Modality = mode
+  const slashMatch = useMemo(
+    () => parseAgentSlash(value, agents, modality),
+    [value, agents, modality],
+  )
+  const pickerAgent = activeAgent(modality)
+  const effectiveAgent = slashMatch?.agent ?? pickerAgent
+
   // In video mode with exactly one selected ai-image, treat it as source frame.
   const sourceImageId = useMemo(() => {
     if (mode !== 'video') return undefined
@@ -145,7 +159,10 @@ export function AiPromptBar({ boardId, editor }: Props) {
 
   async function submit() {
     if (busy || !value.trim() || !editor) return
-    const prompt = value
+    // If a slash-command matched, strip the `/slug ` prefix from the prompt.
+    const prompt = slashMatch ? slashMatch.strippedValue : value
+    if (!prompt.trim()) return
+    const agent = effectiveAgent
     setValue('')
     setBusy(true)
     try {
@@ -155,6 +172,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
           aspect,
           contextShapes: useSelection ? selection : [],
           connectArrows: useSelection,
+          agent,
         })
       } else if (mode === 'video') {
         await generateVideo({
@@ -165,13 +183,20 @@ export function AiPromptBar({ boardId, editor }: Props) {
           // Always draw arrows from selected sources when present (mirrors image flow).
           contextShapes: useSelection ? selection : [],
           connectArrows: useSelection,
+          agent,
         })
       } else {
+        // Text mode: selection always wins (forces selection-qa); otherwise the
+        // agent's defaultMode snaps the mode if set, falling back to 'prompt'.
+        const textMode = useSelection
+          ? 'selection-qa'
+          : agent?.defaultMode ?? 'prompt'
         await generate({
           prompt,
-          mode: useSelection ? 'selection-qa' : 'prompt',
+          mode: textMode,
           contextShapes: useSelection ? selection : [],
           connectArrows: useSelection,
+          agent,
         })
       }
     } finally {
@@ -200,9 +225,19 @@ export function AiPromptBar({ boardId, editor }: Props) {
                 {selection.length} selected
               </span>
             ) : null}
+            <AgentPicker modality={modality} onManage={onOpenAgents} />
             <ModelPicker modality={mode} />
           </div>
         </div>
+
+        {slashMatch && (
+          <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            <span aria-hidden="true">{slashMatch.agent.icon || '✨'}</span>
+            Invoking <span className="font-semibold">{slashMatch.agent.name}</span>
+            <span className="text-neutral-400">— /{slashMatch.agent.slug}</span>
+          </div>
+        )}
 
         {/* Selection chip when in image mode (separate so toggle row stays clean) */}
         {mode === 'image' && useSelection && (
