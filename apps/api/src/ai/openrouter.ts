@@ -9,7 +9,15 @@ export function getOpenRouter(apiKey: string) {
   })
 }
 
-export const MODEL_ID = 'anthropic/claude-haiku-4.5'
+// Hardcoded fallbacks when the client doesn't specify a model. All three are
+// overridable per-request via the optional `model` field on Generate*Request.
+export const DEFAULTS = {
+  text: 'anthropic/claude-haiku-4.5',
+  image: 'google/gemini-2.5-flash-image',
+  video: 'google/veo-3.1-fast',
+} as const
+
+export const MODEL_ID = DEFAULTS.text
 
 const BASE_PROMPT = `You are an AI thinking partner embedded inside an infinite-canvas whiteboard ("OpenBoard AI").
 Your responses appear as cards on the canvas, so:

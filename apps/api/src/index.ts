@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { ai } from './routes/ai.js'
 import { boards } from './routes/boards.js'
 import { images } from './routes/images.js'
+import { models } from './routes/models.js'
 import { settings } from './routes/settings.js'
 import { videos } from './routes/videos.js'
 
@@ -31,6 +32,7 @@ app.route('/api/ai', ai)
 app.route('/api/images', images)
 app.route('/api/videos', videos)
 app.route('/api/settings', settings)
+app.route('/api/models', models)
 
 const webDist = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 const indexHtmlPath = join(webDist, 'index.html')

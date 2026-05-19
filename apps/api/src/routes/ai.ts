@@ -20,7 +20,7 @@ import {
   type VideoAspect,
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
-import { MODEL_ID, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
+import { DEFAULTS, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
 
 export const ai = new Hono()
 
@@ -36,7 +36,8 @@ function requireOpenRouter(c: Context) {
 
 ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
-  const { messages, boardId, mode, context, resultShapeId } = c.req.valid('json')
+  const { messages, boardId, mode, context, resultShapeId, model } = c.req.valid('json')
+  const selected = model?.trim() || DEFAULTS.text
 
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   const promptText = lastUser?.content ?? ''
@@ -45,7 +46,7 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   const llmMessages = attachImagesToLastUser(messages, imageParts)
 
   const result = streamText({
-    model: openrouter.chat(MODEL_ID),
+    model: openrouter.chat(selected),
     system: buildSystemPrompt({ mode, context }),
     messages: llmMessages,
     onFinish: async ({ text }) => {
@@ -55,7 +56,7 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
           boardId,
           prompt: promptText,
           response: text,
-          model: MODEL_ID,
+          model: selected,
           mode,
           contextShapeIds: context?.shapes.map((s) => s.id) ?? [],
           resultShapeId: resultShapeId ?? null,
@@ -72,11 +73,6 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   return result.toTextStreamResponse()
 })
 
-// google/gemini-2.5-flash-image is the most reliable image model on OpenRouter's
-// chat-completions image endpoint (~25x cheaper than gpt-5.4-image-2 and doesn't
-// intermittently return empty 200 bodies). Override via OPENROUTER_IMAGE_MODEL.
-const IMAGE_MODEL_ID = process.env.OPENROUTER_IMAGE_MODEL ?? 'google/gemini-2.5-flash-image'
-
 // Recorded dimensions per aspect — OpenRouter's image SDK ignores `size` and
 // only accepts `aspectRatio`, so these are nominal canvas dimensions we persist
 // for layout (the actual returned image bytes carry their own intrinsic size).
@@ -88,12 +84,14 @@ const DIMS_FOR: Record<ImageAspect, { w: number; h: number }> = {
 
 ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
-  const { boardId, prompt, aspect, resultShapeId } = c.req.valid('json')
+  const { boardId, prompt, aspect, resultShapeId, model } = c.req.valid('json')
+  const selected =
+    model?.trim() || process.env.OPENROUTER_IMAGE_MODEL || DEFAULTS.image
 
   try {
     const dims = DIMS_FOR[aspect]
     const { image } = await generateImage({
-      model: openrouter.imageModel(IMAGE_MODEL_ID),
+      model: openrouter.imageModel(selected),
       prompt,
       aspectRatio: aspect,
     })
@@ -106,7 +104,7 @@ ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) =
       id,
       boardId,
       prompt,
-      model: IMAGE_MODEL_ID,
+      model: selected,
       width: dims.w,
       height: dims.h,
       mediaType,
@@ -127,10 +125,11 @@ ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) =
     console.error('[ai] image generation failed', err)
     const raw = err instanceof Error ? err.message : 'unknown'
     // OpenRouter occasionally returns 200 with an empty body for some image
-    // models (notably the brand-new openai/gpt-5.4-image-2). Surface a hint
-    // instead of the raw JSON-parse error.
+    // models. Surface a hint instead of the raw JSON-parse error.
     const message = /Unexpected end of JSON input|Invalid JSON response/.test(raw)
-      ? `${IMAGE_MODEL_ID} returned an empty response. Try again or set OPENROUTER_IMAGE_MODEL to a different model (e.g. google/gemini-2.5-flash-image).`
+      ? selected === DEFAULTS.image
+        ? `${selected} returned an empty response. Try again or pick a different model.`
+        : `${selected} returned an empty response. Try again or pick a different model (e.g. ${DEFAULTS.image}).`
       : raw
     return c.json({ error: 'image_generation_failed', message }, 500)
   }
@@ -140,7 +139,6 @@ ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) =
 // reservation that returns 402 even with $100+ remaining. veo-3.1-fast is the
 // same model family, supports text-to-video + image-to-video + audio, and
 // runs at ~$0.12/sec @ 1080p+audio (~3× cheaper, smaller hold).
-const VIDEO_MODEL_ID = process.env.OPENROUTER_VIDEO_MODEL ?? 'google/veo-3.1-fast'
 const VIDEO_RES_FOR: Record<
   VideoAspect,
   { aspectRatio: `${number}:${number}`; w: number; h: number }
@@ -151,8 +149,10 @@ const VIDEO_RES_FOR: Record<
 
 ai.post('/generate-video', zValidator('json', GenerateVideoRequest), async (c) => {
   const { openrouter, apiKey } = requireOpenRouter(c)
-  const { boardId, prompt, aspect, generateAudio, sourceImageId, resultShapeId } =
+  const { boardId, prompt, aspect, generateAudio, sourceImageId, resultShapeId, model } =
     c.req.valid('json')
+  const selected =
+    model?.trim() || process.env.OPENROUTER_VIDEO_MODEL || DEFAULTS.video
 
   try {
     let imageInput:
@@ -178,7 +178,7 @@ ai.post('/generate-video', zValidator('json', GenerateVideoRequest), async (c) =
     const dims = VIDEO_RES_FOR[aspect]
 
     const { videos, providerMetadata, warnings } = await generateVideo({
-      model: openrouter.videoModel(VIDEO_MODEL_ID, {
+      model: openrouter.videoModel(selected, {
         generateAudio,
         pollIntervalMs: 3000,
         maxPollTimeMs: 600_000,
@@ -222,7 +222,7 @@ ai.post('/generate-video', zValidator('json', GenerateVideoRequest), async (c) =
       id,
       boardId,
       prompt,
-      model: VIDEO_MODEL_ID,
+      model: selected,
       width: dims.w,
       height: dims.h,
       durationMs,
