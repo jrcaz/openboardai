@@ -22,6 +22,8 @@ import { useToolsVisible } from './useToolsVisible'
 
 const customShapeUtils = [AiCardShapeUtil, AiImageShapeUtil, AiVideoShapeUtil]
 
+const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
+
 interface Props {
   boardId: string
 }
@@ -138,6 +140,7 @@ export function BoardEditor({ boardId }: Props) {
         shapeUtils={customShapeUtils}
         snapshot={initialSnapshotRef.current ?? undefined}
         onMount={handleMount}
+        licenseKey={TLDRAW_LICENSE_KEY || undefined}
       />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
