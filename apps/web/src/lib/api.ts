@@ -1,4 +1,11 @@
-import type { BoardResponse, Modality, ModelsResponse } from '@openboard-ai/shared'
+import type {
+  BoardResponse,
+  Modality,
+  ModelsResponse,
+  UploadAssetResponse,
+  UploadImageRequest,
+  UploadVideoRequest,
+} from '@openboard-ai/shared'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -28,6 +35,34 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ snapshot }),
     }).then((r) => json<BoardResponse>(r)),
+
+  exportBoard: async (id: string): Promise<Blob> => {
+    const res = await fetch(`/api/boards/${id}/export`)
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${body}`)
+    }
+    return res.blob()
+  },
+
+  deleteBoardAssets: (id: string) =>
+    fetch(`/api/boards/${id}/assets`, { method: 'DELETE' }).then((r) =>
+      json<{ ok: true }>(r),
+    ),
+
+  uploadImage: (req: UploadImageRequest) =>
+    fetch('/api/images/upload', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(req),
+    }).then((r) => json<UploadAssetResponse>(r)),
+
+  uploadVideo: (req: UploadVideoRequest) =>
+    fetch('/api/videos/upload', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(req),
+    }).then((r) => json<UploadAssetResponse>(r)),
 
   validateKey: async (key: string): Promise<ValidateKeyResponse> => {
     try {
