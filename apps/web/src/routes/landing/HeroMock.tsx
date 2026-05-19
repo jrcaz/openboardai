@@ -1,6 +1,6 @@
 export function HeroMock() {
   return (
-    <div className="relative aspect-[5/4] w-full overflow-hidden rounded-3xl bg-white shadow-[0_20px_60px_-25px_rgba(76,29,149,0.35)] ring-1 ring-violet-100">
+    <div className="relative aspect-[5/4] w-full overflow-hidden rounded-3xl bg-white shadow-[0_20px_60px_-25px_rgba(120,53,15,0.35)] ring-1 ring-amber-100">
       <div className="lp-dot-grid absolute inset-0" aria-hidden="true" />
 
       <div
@@ -26,13 +26,13 @@ export function HeroMock() {
       >
         <defs>
           <marker id="lp-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L10,5 L0,10 z" fill="#a78bfa" />
+            <path d="M0,0 L10,5 L0,10 z" fill="#fbbf24" />
           </marker>
         </defs>
         <path
           d="M210,150 C260,170 270,210 310,230"
           fill="none"
-          stroke="#a78bfa"
+          stroke="#fbbf24"
           strokeWidth="2"
           strokeDasharray="4 4"
           markerEnd="url(#lp-arrow)"
@@ -40,16 +40,16 @@ export function HeroMock() {
       </svg>
 
       <div
-        className="lp-float-b absolute bottom-[10%] right-[6%] w-[54%] rounded-xl bg-white px-4 py-3.5 shadow-[0_12px_30px_-12px_rgba(76,29,149,0.35)] ring-1 ring-violet-200"
+        className="lp-float-b absolute bottom-[10%] right-[6%] w-[54%] rounded-xl bg-white px-4 py-3.5 shadow-[0_12px_30px_-12px_rgba(120,53,15,0.35)] ring-1 ring-amber-200"
         aria-hidden="true"
       >
         <div className="mb-2 flex items-center gap-1.5">
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-[8px] text-white">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-400 text-[8px] text-neutral-900">
             <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6z" />
             </svg>
           </span>
-          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-violet-700">
+          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-amber-700">
             AI card · generating
           </span>
         </div>
@@ -60,7 +60,7 @@ export function HeroMock() {
           <div className="lp-shimmer-bar h-2.5 w-[80%] rounded-full" />
           <div className="flex items-center gap-1">
             <div className="lp-shimmer-bar h-2.5 w-[40%] rounded-full" />
-            <span className="lp-caret -mt-0.5 inline-block h-3 w-[2px] bg-violet-500" />
+            <span className="lp-caret -mt-0.5 inline-block h-3 w-[2px] bg-amber-500" />
           </div>
         </div>
       </div>
@@ -74,7 +74,7 @@ export function HeroMock() {
         <span className="pl-0.5 text-white/80">ask Claude</span>
       </div>
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-violet-50/60 via-transparent to-fuchsia-50/40" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-yellow-50/60 via-transparent to-amber-50/40" aria-hidden="true" />
     </div>
   )
 }
