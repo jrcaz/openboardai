@@ -106,7 +106,7 @@ export function Features() {
     <section id="features" className="border-t border-neutral-100 bg-neutral-50/60 py-20 sm:py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="max-w-2xl">
-          <div className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-violet-600">
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-amber-600">
             What's on the board
           </div>
           <h2 className="mt-3 text-[32px] font-semibold leading-tight tracking-tight text-neutral-900 sm:text-[36px]">
@@ -121,10 +121,10 @@ export function Features() {
           {FEATURES.map((f) => (
             <li
               key={f.title}
-              className="group relative flex flex-col rounded-2xl border border-neutral-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-[0_12px_30px_-15px_rgba(76,29,149,0.25)]"
+              className="group relative flex flex-col rounded-2xl border border-neutral-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-[0_12px_30px_-15px_rgba(120,53,15,0.25)]"
             >
               <div className="flex items-start justify-between">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-50 to-fuchsia-50 text-violet-600 ring-1 ring-violet-100">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-50 to-amber-50 text-amber-600 ring-1 ring-amber-100">
                   {f.icon}
                 </div>
                 {f.badge && (

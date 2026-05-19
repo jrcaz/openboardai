@@ -13,7 +13,7 @@ export function ToolsToggle({ visible, onToggle }: Props) {
       aria-label={visible ? 'Hide drawing tools and style panel' : 'Show drawing tools and style panel'}
       className={`pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border shadow-[0_4px_24px_-8px_rgba(0,0,0,0.18)] backdrop-blur transition ${
         visible
-          ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+          ? 'border-amber-200 bg-yellow-50 text-amber-700 hover:bg-yellow-100'
           : 'border-neutral-200 bg-white/95 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
       }`}
     >

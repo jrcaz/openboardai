@@ -14,7 +14,7 @@ export function Hero({ onStart, starting }: Props) {
         aria-hidden="true"
       >
         <div
-          className="relative left-1/2 aspect-[1155/678] w-[72rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-violet-300 to-fuchsia-200 opacity-40"
+          className="relative left-1/2 aspect-[1155/678] w-[72rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-amber-300 to-yellow-200 opacity-40"
           style={{
             clipPath:
               'polygon(74% 44%, 100% 61%, 97% 26%, 85% 0%, 80% 2%, 72% 32%, 60% 62%, 52% 68%, 47% 58%, 45% 34%, 27% 76%, 0% 64%, 17% 100%, 27% 76%, 76% 97%, 74% 44%)',
@@ -27,7 +27,7 @@ export function Hero({ onStart, starting }: Props) {
           <div className="lg:col-span-6">
             <h1 className="lp-fade-up text-[40px] font-semibold leading-[1.05] tracking-tight text-neutral-900 sm:text-[52px] lg:text-[56px]">
               An AI-native{' '}
-              <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
                 infinite whiteboard
               </span>
               .
@@ -41,7 +41,7 @@ export function Hero({ onStart, starting }: Props) {
                 type="button"
                 onClick={onStart}
                 disabled={starting}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-3 text-[14px] font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:translate-y-[-1px] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 px-5 py-3 text-[14px] font-semibold text-neutral-900 shadow-lg shadow-amber-500/30 transition hover:translate-y-[-1px] hover:from-amber-500 hover:to-orange-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {starting ? (
                   <>

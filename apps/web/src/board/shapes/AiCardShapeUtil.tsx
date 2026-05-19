@@ -107,8 +107,8 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
         ref={cardRef}
         className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08),0_8px_24px_-12px_rgba(0,0,0,0.18)]"
       >
-        <header className="flex items-center gap-2 border-b border-neutral-100 bg-gradient-to-r from-violet-50 to-sky-50 px-3 py-2">
-          <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-violet-600 text-[10px] font-semibold text-white">
+        <header className="flex items-center gap-2 border-b border-neutral-100 bg-gradient-to-r from-yellow-50 to-amber-50 px-3 py-2">
+          <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-amber-400 text-[10px] font-semibold text-amber-950">
             AI
           </span>
           <span
@@ -153,7 +153,7 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
                   new CustomEvent('ai-card:expand', { detail: { shapeId: shape.id } }),
                 )
               }}
-              className="rounded bg-violet-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-violet-700"
+              className="rounded bg-amber-400 px-2 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-500"
             >
               Expand
             </button>
@@ -167,7 +167,7 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
 function StatusDot({ status }: { status: AiCardShape['props']['status'] }) {
   const color =
     status === 'streaming'
-      ? 'bg-violet-500 animate-pulse'
+      ? 'bg-amber-500 animate-pulse'
       : status === 'done'
       ? 'bg-emerald-500'
       : status === 'error'
@@ -178,7 +178,7 @@ function StatusDot({ status }: { status: AiCardShape['props']['status'] }) {
 
 function Caret() {
   return (
-    <span className="ml-0.5 inline-block h-3.5 w-1.5 -translate-y-px animate-pulse bg-violet-500 align-middle" />
+    <span className="ml-0.5 inline-block h-3.5 w-1.5 -translate-y-px animate-pulse bg-amber-500 align-middle" />
   )
 }
 
