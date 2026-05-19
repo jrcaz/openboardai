@@ -202,3 +202,74 @@ body,
   pointer-events: none;
   transition: opacity 200ms ease-out;
 }
+
+/* --- Landing page motion --- */
+
+@keyframes lp-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.lp-fade-up      { animation: lp-fade-up 0.6s ease-out both; }
+.lp-fade-up-d1   { animation: lp-fade-up 0.6s ease-out 0.08s both; }
+.lp-fade-up-d2   { animation: lp-fade-up 0.6s ease-out 0.16s both; }
+.lp-fade-up-d3   { animation: lp-fade-up 0.6s ease-out 0.24s both; }
+.lp-fade-up-d4   { animation: lp-fade-up 0.6s ease-out 0.32s both; }
+
+@keyframes lp-float-a {
+  0%, 100% { transform: rotate(-3deg) translateY(0); }
+  50%      { transform: rotate(-3deg) translateY(-6px); }
+}
+.lp-float-a { animation: lp-float-a 5s ease-in-out infinite; }
+
+@keyframes lp-float-b {
+  0%, 100% { transform: rotate(2deg) translateY(0); }
+  50%      { transform: rotate(2deg) translateY(-4px); }
+}
+.lp-float-b { animation: lp-float-b 6s ease-in-out infinite 0.4s; }
+
+@keyframes lp-shimmer-bar {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.lp-shimmer-bar {
+  background: linear-gradient(90deg, #f3e8ff 0%, #fae8ff 45%, #f5d0fe 50%, #fae8ff 55%, #f3e8ff 100%);
+  background-size: 200% 100%;
+  animation: lp-shimmer-bar 1.8s linear infinite;
+}
+
+@keyframes lp-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.lp-caret { animation: lp-caret 1s steps(1) infinite; }
+
+@keyframes lp-pill-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+.lp-pill-float { animation: lp-pill-float 3s ease-in-out infinite; }
+
+.lp-dot-grid {
+  background-image: radial-gradient(circle, #d4d4d8 1px, transparent 1.5px);
+  background-size: 22px 22px;
+  background-position: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-fade-up,
+  .lp-fade-up-d1,
+  .lp-fade-up-d2,
+  .lp-fade-up-d3,
+  .lp-fade-up-d4,
+  .lp-float-a,
+  .lp-float-b,
+  .lp-shimmer-bar,
+  .lp-caret,
+  .lp-pill-float,
+  .animate-ai-image-shimmer,
+  .animate-ai-image-dot,
+  .animate-ai-image-pulse-soft,
+  .animate-ai-image-float {
+    animation: none !important;
+  }
+}
