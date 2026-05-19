@@ -5,6 +5,11 @@ import { AI_CARD_TYPE, type AiCardShape } from '../shapes/AiCardShapeUtil'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import { createConnectingArrow, extractImageRef, extractShapeText, pickAnchor } from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
+import {
+  clearModelPreference,
+  getModelPreference,
+  looksLikeBadModelError,
+} from '../../settings/useModelPreferences'
 
 export type GenerateMode = GenerateRequest['mode']
 
@@ -84,6 +89,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       })
 
       try {
+        const modelPref = getModelPreference('text')
         const res = await fetch('/api/ai/generate', {
           method: 'POST',
           headers: {
@@ -96,6 +102,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
             mode,
             context: ctx.length > 0 ? { shapes: ctx } : undefined,
             resultShapeId: cardId as string,
+            ...(modelPref ? { model: modelPref } : {}),
           } satisfies GenerateRequest),
         })
 
@@ -151,6 +158,10 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
         return { cardId, text: acc }
       } catch (err) {
         console.error('[ai] generate failed', err)
+        const message = err instanceof Error ? err.message : ''
+        if (getModelPreference('text') && looksLikeBadModelError(message)) {
+          clearModelPreference('text')
+        }
         editor.run(
           () => {
             updateCustomShape<AiCardShape>(editor, {

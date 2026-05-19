@@ -4,6 +4,7 @@ import type { ImageAspect, VideoAspect } from '@openboard-ai/shared'
 import { useAiGenerate } from './useAiGenerate'
 import { useAiImageGenerate } from './useAiImageGenerate'
 import { useAiVideoGenerate } from './useAiVideoGenerate'
+import { ModelPicker } from './ModelPicker'
 
 interface Props {
   boardId: string
@@ -181,25 +182,26 @@ export function AiPromptBar({ boardId, editor }: Props) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-50 flex justify-center pb-20">
       <div className="pointer-events-auto flex w-[min(720px,90vw)] flex-col gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.18)] backdrop-blur">
-        {/* Top strip: Mode toggle + (selection or aspect chips) */}
+        {/* Top strip: Mode toggle + (selection or aspect chips) + model picker */}
         <div className="flex items-center justify-between gap-2 px-1 pt-0.5">
           <ModeToggle mode={mode} onChange={setMode} />
 
-          {mode === 'image' ? (
-            <AspectPicker value={aspect} onChange={setAspect} />
-          ) : mode === 'video' ? (
-            <div className="flex items-center gap-1.5">
-              <VideoAspectPicker value={videoAspect} onChange={setVideoAspect} />
-              <AudioToggle value={generateAudio} onChange={setGenerateAudio} />
-            </div>
-          ) : useSelection ? (
-            <span className="flex items-center gap-1.5 text-[11px] font-medium text-violet-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-              {selection.length} selected · arrows back
-            </span>
-          ) : (
-            <span className="text-[11px] text-neutral-400">⌘K to focus</span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {mode === 'image' ? (
+              <AspectPicker value={aspect} onChange={setAspect} />
+            ) : mode === 'video' ? (
+              <>
+                <VideoAspectPicker value={videoAspect} onChange={setVideoAspect} />
+                <AudioToggle value={generateAudio} onChange={setGenerateAudio} />
+              </>
+            ) : useSelection ? (
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-violet-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                {selection.length} selected
+              </span>
+            ) : null}
+            <ModelPicker modality={mode} />
+          </div>
         </div>
 
         {/* Selection chip when in image mode (separate so toggle row stays clean) */}

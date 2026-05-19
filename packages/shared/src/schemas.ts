@@ -59,6 +59,7 @@ export const GenerateRequest = z.object({
     })
     .optional(),
   resultShapeId: z.string().optional(),
+  model: z.string().min(1).max(200).optional(),
 })
 export type GenerateRequest = z.infer<typeof GenerateRequest>
 
@@ -72,6 +73,7 @@ export const GenerateImageRequest = z.object({
   prompt: z.string().trim().min(1).max(2000),
   aspect: ImageAspect.default('1:1'),
   resultShapeId: z.string().optional(),
+  model: z.string().min(1).max(200).optional(),
 })
 export type GenerateImageRequest = z.infer<typeof GenerateImageRequest>
 
@@ -98,6 +100,7 @@ export const GenerateVideoRequest = z.object({
   /** When set, perform image-to-video using this aiImages.id as the first frame. */
   sourceImageId: z.string().optional(),
   resultShapeId: z.string().optional(),
+  model: z.string().min(1).max(200).optional(),
 })
 export type GenerateVideoRequest = z.infer<typeof GenerateVideoRequest>
 
@@ -112,3 +115,35 @@ export const GenerateVideoResponse = z.object({
   prompt: z.string(),
 })
 export type GenerateVideoResponse = z.infer<typeof GenerateVideoResponse>
+
+// --- OpenRouter model catalog ---
+
+export const Modality = z.enum(['text', 'image', 'video'])
+export type Modality = z.infer<typeof Modality>
+
+export const ModelPricing = z.object({
+  prompt: z.number().optional(),
+  completion: z.number().optional(),
+  image: z.number().optional(),
+  request: z.number().optional(),
+})
+export type ModelPricing = z.infer<typeof ModelPricing>
+
+export const ModelInfo = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  contextLength: z.number().int().nullable(),
+  inputModalities: z.array(z.string()),
+  outputModalities: z.array(z.string()),
+  pricing: ModelPricing,
+  provider: z.string().nullable(),
+  isDefault: z.boolean(),
+})
+export type ModelInfo = z.infer<typeof ModelInfo>
+
+export const ModelsResponse = z.object({
+  data: z.array(ModelInfo),
+  cachedAt: z.number(),
+})
+export type ModelsResponse = z.infer<typeof ModelsResponse>
