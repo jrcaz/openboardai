@@ -1,23 +1,62 @@
 name: openboard-ai
 
+# Two ways to use this file:
+#
+#   pnpm db:up
+#     Boots just Postgres on :5436 — the workflow used during local
+#     development (`pnpm dev` runs web + api on the host).
+#
+#   docker compose --profile app up -d
+#     Boots Postgres AND a self-contained app container that bundles the
+#     web bundle + API into one Node process. The full stack runs in
+#     Docker — handy for self-hosting on your own infra.
+#
+# Environment is read from a sibling .env file (see .env.example).
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: openboard-ai-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: openboard_ai
-      POSTGRES_PASSWORD: openboard_ai
-      POSTGRES_DB: openboard_ai
+      POSTGRES_USER: ${POSTGRES_USER:-openboard_ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openboard_ai}
+      POSTGRES_DB: ${POSTGRES_DB:-openboard_ai}
     ports:
-      - "5436:5432"
+      - "${POSTGRES_PORT:-5436}:5432"
     volumes:
       - openboard-ai-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openboard_ai -d openboard_ai"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openboard_ai} -d ${POSTGRES_DB:-openboard_ai}"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  app:
+    profiles: ["app"]
+    image: openboard-ai:local
+    container_name: openboard-ai-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Baked into the web bundle at build time. Leave empty to ship
+        # with the "Made with tldraw" watermark.
+        VITE_TLDRAW_LICENSE_KEY: ${VITE_TLDRAW_LICENSE_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Inside the compose network, talk to postgres by service name on 5432.
+      DATABASE_URL: ${DATABASE_URL:-postgres://openboard_ai:openboard_ai@postgres:5432/openboard_ai}
+      API_PORT: ${API_PORT:-3001}
+      OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-openboard-ai}
+      OPENROUTER_APP_URL: ${OPENROUTER_APP_URL:-http://localhost:3001}
+      OPENROUTER_IMAGE_MODEL: ${OPENROUTER_IMAGE_MODEL:-}
+      OPENROUTER_VIDEO_MODEL: ${OPENROUTER_VIDEO_MODEL:-}
+    ports:
+      - "${APP_PORT:-3001}:3001"
 
 volumes:
   openboard-ai-pgdata:
