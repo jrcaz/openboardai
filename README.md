@@ -58,6 +58,60 @@ Open <http://localhost:5173>. On first load you'll be prompted for your OpenRout
 
 ---
 
+## Self-host with Docker
+
+For running OpenBoard AI on your own infrastructure (a VPS, a homelab box,
+anywhere with Docker) the repo ships a multi-stage `Dockerfile` and a
+compose profile that brings up the web app **and** Postgres together as a
+single group.
+
+```bash
+cp .env.example .env          # tweak ports / model overrides if you want
+docker compose --profile app up -d --build
+```
+
+That's it — once the `app` container reports healthy, open
+<http://localhost:3001> and you're in.
+
+What the `app` profile does:
+
+- Builds a single image that bundles the Vite-built web assets and the Hono
+  API into one Node process (the API serves `/` as static assets and `/api/*`
+  as routes).
+- Starts Postgres 16 with a persistent volume (`openboard-ai-pgdata`).
+- Waits for Postgres to be healthy, then runs Drizzle migrations on
+  startup before booting the server.
+- Re-uses the same `.env` file as local dev. The `DATABASE_URL` inside the
+  app container is overridden by compose to point at the `postgres` service
+  on the internal network — your host-side `.env` value (which uses
+  `localhost:5436`) is left untouched so `pnpm dev` keeps working.
+
+Useful commands:
+
+```bash
+docker compose --profile app up -d --build    # build + start full stack
+docker compose --profile app logs -f app      # tail app logs
+docker compose --profile app down             # stop (keeps the db volume)
+docker compose --profile app down -v          # stop AND wipe the db volume
+```
+
+Notes for production:
+
+- The image runs as the non-root `node` user and exposes a `/health` HTTP
+  check that the container healthcheck uses.
+- To use a managed Postgres instead of the bundled one, set `DATABASE_URL`
+  in `.env` and run only the `app` service:
+  `docker compose run --rm app` (or remove the `postgres` dependency).
+- The tldraw license key is baked into the web bundle at build time. Set
+  `VITE_TLDRAW_LICENSE_KEY` in `.env` before `--build` if you have one;
+  otherwise the bundle ships with tldraw's "Made with tldraw" watermark
+  (required by the tldraw SDK license — see the bottom of this README).
+- Migrations run automatically on every boot. Set `SKIP_MIGRATIONS=1` in
+  the app container's environment to disable that if you'd rather run
+  them out-of-band.
+
+---
+
 ## How it works
 
 ```
