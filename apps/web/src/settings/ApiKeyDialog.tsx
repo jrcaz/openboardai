@@ -52,9 +52,11 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
     if (editing) inputRef.current?.focus()
   }, [editing])
 
-  // ESC closes (settings mode only).
+  // ESC closes when dismissible — settings mode always, setup mode only if the
+  // caller passed an onClose (e.g. landing CTA). The top-level gate omits onClose
+  // so the modal stays blocking until a key is entered.
   useEffect(() => {
-    if (isSetup) return
+    if (isSetup && !onClose) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && status.kind !== 'validating') onClose?.()
     }
@@ -108,7 +110,7 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
   }
 
   function onBackdropClick(e: React.MouseEvent) {
-    if (isSetup || status.kind === 'validating') return
+    if ((isSetup && !onClose) || status.kind === 'validating') return
     if (e.target === e.currentTarget) onClose?.()
   }
 
@@ -127,8 +129,20 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
     >
       <div
         ref={cardRef}
-        className="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 p-7"
+        className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 p-7"
       >
+        {isSetup && onClose && (
+          <button
+            type="button"
+            onClick={() => status.kind !== 'validating' && onClose()}
+            aria-label="Close"
+            className="absolute right-3 top-3 rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6l-12 12" />
+            </svg>
+          </button>
+        )}
         <div className="mb-5">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
