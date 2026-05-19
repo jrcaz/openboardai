@@ -5,6 +5,11 @@ import { AI_IMAGE_TYPE, type AiImageShape } from '../shapes/AiImageShapeUtil'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import { createConnectingArrow, pickAnchor } from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
+import {
+  clearModelPreference,
+  getModelPreference,
+  looksLikeBadModelError,
+} from '../../settings/useModelPreferences'
 
 interface GenerateImageOptions {
   prompt: string
@@ -80,6 +85,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
       }
 
       try {
+        const modelPref = getModelPreference('image')
         const res = await fetch('/api/ai/generate-image', {
           method: 'POST',
           headers: {
@@ -91,6 +97,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
             prompt: trimmed,
             aspect,
             resultShapeId: shapeId as string,
+            ...(modelPref ? { model: modelPref } : {}),
           } satisfies GenerateImageRequest),
         })
 
@@ -125,6 +132,9 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
       } catch (err) {
         console.error('[ai] image generate failed', err)
         const message = err instanceof Error ? err.message : 'Generation failed'
+        if (getModelPreference('image') && looksLikeBadModelError(message)) {
+          clearModelPreference('image')
+        }
         editor.run(
           () => {
             updateCustomShape<AiImageShape>(editor, {

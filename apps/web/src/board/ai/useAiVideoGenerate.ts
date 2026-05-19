@@ -9,6 +9,11 @@ import { AI_VIDEO_TYPE, type AiVideoShape } from '../shapes/AiVideoShapeUtil'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import { createConnectingArrow, pickAnchor } from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
+import {
+  clearModelPreference,
+  getModelPreference,
+  looksLikeBadModelError,
+} from '../../settings/useModelPreferences'
 
 interface GenerateVideoOptions {
   prompt: string
@@ -94,6 +99,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
       }
 
       try {
+        const modelPref = getModelPreference('video')
         const res = await fetch('/api/ai/generate-video', {
           method: 'POST',
           headers: {
@@ -107,6 +113,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
             generateAudio,
             ...(sourceImageId ? { sourceImageId } : {}),
             resultShapeId: shapeId as string,
+            ...(modelPref ? { model: modelPref } : {}),
           } satisfies GenerateVideoRequest),
         })
 
@@ -142,6 +149,9 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
       } catch (err) {
         console.error('[ai] video generate failed', err)
         const message = err instanceof Error ? err.message : 'Generation failed'
+        if (getModelPreference('video') && looksLikeBadModelError(message)) {
+          clearModelPreference('video')
+        }
         editor.run(
           () => {
             updateCustomShape<AiVideoShape>(editor, {

@@ -1,4 +1,4 @@
-import type { BoardResponse } from '@openboard-ai/shared'
+import type { BoardResponse, Modality, ModelsResponse } from '@openboard-ai/shared'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -41,5 +41,12 @@ export const api = {
     } catch {
       return { valid: false, reason: 'network' }
     }
+  },
+
+  fetchModels: async (modality: Modality, apiKey: string): Promise<ModelsResponse> => {
+    const res = await fetch(`/api/models?modality=${encodeURIComponent(modality)}`, {
+      headers: { 'X-OpenRouter-Key': apiKey },
+    })
+    return json<ModelsResponse>(res)
   },
 }
