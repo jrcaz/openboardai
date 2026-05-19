@@ -45,6 +45,14 @@ const THEME: Record<
     accent: 'text-amber-800',
     label: 'Video',
   },
+  audio: {
+    text: 'text-indigo-700',
+    bg: 'bg-indigo-50',
+    ring: 'ring-indigo-200',
+    chip: 'bg-indigo-100 text-indigo-800',
+    accent: 'text-indigo-600',
+    label: 'Audio',
+  },
 }
 
 function shortName(id: string): string {
@@ -54,7 +62,8 @@ function shortName(id: string): string {
 
 function formatPrice(m: ModelInfo, modality: Modality): string {
   const p = m.pricing
-  if (modality === 'text') {
+  // Audio transcription uses chat models — same per-token pricing as text.
+  if (modality === 'text' || modality === 'audio') {
     const prompt = p.prompt ?? 0
     const completion = p.completion ?? p.prompt ?? 0
     if (!prompt && !completion) return 'Free'
@@ -267,7 +276,9 @@ export function ModelPicker({ modality }: Props) {
                   ? 'bg-amber-500'
                   : modality === 'image'
                   ? 'bg-orange-500'
-                  : 'bg-amber-800'
+                  : modality === 'video'
+                  ? 'bg-amber-800'
+                  : 'bg-indigo-500'
               }`}
             />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">

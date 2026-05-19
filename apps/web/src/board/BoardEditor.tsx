@@ -10,6 +10,7 @@ import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
 import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
 import { AiImageShapeUtil } from './shapes/AiImageShapeUtil'
+import { AiTranscriptionShapeUtil } from './shapes/AiTranscriptionShapeUtil'
 import { AiVideoShapeUtil } from './shapes/AiVideoShapeUtil'
 import { AiPromptBar } from './ai/AiPromptBar'
 import { PresentationToggle } from './present/PresentationToggle'
@@ -20,7 +21,12 @@ import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
 
-const customShapeUtils = [AiCardShapeUtil, AiImageShapeUtil, AiVideoShapeUtil]
+const customShapeUtils = [
+  AiCardShapeUtil,
+  AiImageShapeUtil,
+  AiVideoShapeUtil,
+  AiTranscriptionShapeUtil,
+]
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 

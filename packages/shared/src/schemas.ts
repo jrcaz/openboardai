@@ -116,9 +116,47 @@ export const GenerateVideoResponse = z.object({
 })
 export type GenerateVideoResponse = z.infer<typeof GenerateVideoResponse>
 
+// --- AI transcription (audio → text) ---
+
+// 25 MB cap on raw audio. Base64 inflates by ~33% so the encoded payload
+// budget is ~33.3 MB — well within Hono's default body size limits but
+// large enough for ~20 min of Opus@32 kbps speech.
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024
+
+export const AudioMediaType = z.enum([
+  // MediaRecorder defaults — Chrome/Firefox emit webm, Safari emits mp4.
+  'audio/webm',
+  'audio/ogg',
+  'audio/mp4',
+  // Common uploaded file types.
+  'audio/aac',
+  'audio/mpeg', // mp3
+  'audio/wav',
+  'audio/x-wav',
+  'audio/flac',
+])
+export type AudioMediaType = z.infer<typeof AudioMediaType>
+
+export const GenerateTranscriptionRequest = z.object({
+  boardId: z.string(),
+  /** base64-encoded audio bytes (no data: prefix). */
+  audioBase64: z
+    .string()
+    .min(1)
+    .max(Math.ceil((MAX_AUDIO_BYTES * 4) / 3)),
+  mediaType: AudioMediaType,
+  /** Best-effort duration captured client-side; surfaced in the card UI. */
+  durationMs: z.number().int().nonnegative().optional(),
+  /** Free-form steering, e.g. "translate to English" or "summarize as bullets". */
+  instruction: z.string().trim().max(500).optional(),
+  resultShapeId: z.string().optional(),
+  model: z.string().min(1).max(200).optional(),
+})
+export type GenerateTranscriptionRequest = z.infer<typeof GenerateTranscriptionRequest>
+
 // --- OpenRouter model catalog ---
 
-export const Modality = z.enum(['text', 'image', 'video'])
+export const Modality = z.enum(['text', 'image', 'video', 'audio'])
 export type Modality = z.infer<typeof Modality>
 
 export const ModelPricing = z.object({

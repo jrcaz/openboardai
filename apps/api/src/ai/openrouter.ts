@@ -15,6 +15,8 @@ export const DEFAULTS = {
   text: 'anthropic/claude-haiku-4.5',
   image: 'google/gemini-2.5-flash-image',
   video: 'google/veo-3.1-fast',
+  // Multimodal chat model — accepts audio input, returns text.
+  audio: 'google/gemini-2.5-flash',
 } as const
 
 export const MODEL_ID = DEFAULTS.text
@@ -25,7 +27,7 @@ Your responses appear as cards on the canvas, so:
 - Use markdown lists when enumerating ideas; bold key terms.
 - Avoid hedging preambles. Get to the point in the first sentence.
 - When the user provides selected shapes as context, those shapes ARE present on the canvas — never claim no selection exists. Treat them as the subject of the question and refer to their content directly.
-- Shape types you may see: "ai-card" (a previous AI exchange — has both the prior prompt and prior response), "ai-image" (an AI-generated image with its prompt as caption), "ai-video" (an AI-generated video with its prompt as caption), "image" (a user-uploaded image), "geo"/"text"/"note" (user-authored shapes).
+- Shape types you may see: "ai-card" (a previous AI exchange — has both the prior prompt and prior response), "ai-image" (an AI-generated image with its prompt as caption), "ai-video" (an AI-generated video with its prompt as caption), "ai-transcription" (a transcribed audio clip — the text is the transcript of what was spoken, with the original audio attached on the canvas), "image" (a user-uploaded image), "geo"/"text"/"note" (user-authored shapes).
 - When a selected shape is an "image" or "ai-image", its visual content is attached to your message as an inline image — describe what you actually see in it, do not say you can't view images.`
 
 export function buildSystemPrompt(opts: {

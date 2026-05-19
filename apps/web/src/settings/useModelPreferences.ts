@@ -16,9 +16,10 @@ export interface ModelPreferences {
   text: string | null
   image: string | null
   video: string | null
+  audio: string | null
 }
 
-const EMPTY: ModelPreferences = { text: null, image: null, video: null }
+const EMPTY: ModelPreferences = { text: null, image: null, video: null, audio: null }
 
 function read(): ModelPreferences {
   if (typeof window === 'undefined') return EMPTY
@@ -30,6 +31,7 @@ function read(): ModelPreferences {
       text: typeof parsed.text === 'string' && parsed.text ? parsed.text : null,
       image: typeof parsed.image === 'string' && parsed.image ? parsed.image : null,
       video: typeof parsed.video === 'string' && parsed.video ? parsed.video : null,
+      audio: typeof parsed.audio === 'string' && parsed.audio ? parsed.audio : null,
     }
   } catch {
     return EMPTY
@@ -39,7 +41,7 @@ function read(): ModelPreferences {
 function write(prefs: ModelPreferences) {
   if (typeof window === 'undefined') return
   // Drop the entry entirely when empty to keep localStorage tidy.
-  if (!prefs.text && !prefs.image && !prefs.video) {
+  if (!prefs.text && !prefs.image && !prefs.video && !prefs.audio) {
     window.localStorage.removeItem(MODEL_PREFS_STORAGE)
     return
   }

@@ -13,6 +13,7 @@ import { nanoid } from 'nanoid'
 import {
   GenerateImageRequest,
   GenerateRequest,
+  GenerateTranscriptionRequest,
   GenerateVideoRequest,
   type GenerateImageResponse,
   type GenerateVideoResponse,
@@ -250,6 +251,101 @@ ai.post('/generate-video', zValidator('json', GenerateVideoRequest), async (c) =
     return c.json({ error: 'video_generation_failed', message }, 500)
   }
 })
+
+ai.post(
+  '/generate-transcription',
+  zValidator('json', GenerateTranscriptionRequest),
+  async (c) => {
+    const { openrouter } = requireOpenRouter(c)
+    const { boardId, audioBase64, mediaType, durationMs, instruction, resultShapeId, model } =
+      c.req.valid('json')
+    const selected =
+      model?.trim() || process.env.OPENROUTER_AUDIO_MODEL || DEFAULTS.audio
+
+    let audioBuf: Buffer
+    try {
+      audioBuf = Buffer.from(audioBase64, 'base64')
+      if (audioBuf.byteLength === 0) throw new Error('empty')
+    } catch {
+      return c.json({ error: 'bad_request', message: 'audioBase64 was empty or invalid' }, 400)
+    }
+    const audioBytes = new Uint8Array(audioBuf.byteLength)
+    audioBytes.set(audioBuf)
+
+    // Persist source audio up-front so `/api/audios/:id` can serve it during
+    // streaming (the client gets the id back via response headers before the
+    // model emits its first token) and so a failed transcription stays retryable.
+    const id = nanoid(12)
+    try {
+      await db.insert(schema.aiTranscriptions).values({
+        id,
+        boardId,
+        model: selected,
+        mediaType,
+        bytes: audioBuf,
+        durationMs: durationMs ?? null,
+        transcript: '',
+        instruction: instruction ?? null,
+        resultShapeId: resultShapeId ?? null,
+      })
+    } catch (err) {
+      console.error('[ai] failed to persist transcription row', err)
+      return c.json({ error: 'persist_failed', message: 'could not save audio' }, 500)
+    }
+
+    const trimmedInstruction = instruction?.trim()
+    const systemLines = [
+      'You are a precise transcription engine. Convert the user-supplied audio into plain text.',
+      '- Preserve speaker phrasing; do not summarize or paraphrase unless the user explicitly asks.',
+      '- Use sentence punctuation and natural paragraph breaks.',
+      '- Output the transcript text only — no markdown headers, no commentary, no preface.',
+    ]
+    if (trimmedInstruction) {
+      systemLines.push('', `Additional instruction from the user: ${trimmedInstruction}`)
+    }
+    const system = systemLines.join('\n')
+
+    const result = streamText({
+      model: openrouter.chat(selected),
+      system,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'file', data: audioBytes, mediaType },
+            { type: 'text', text: 'Transcribe the audio above.' },
+          ],
+        },
+      ],
+      onFinish: async ({ text }) => {
+        try {
+          await db
+            .update(schema.aiTranscriptions)
+            .set({ transcript: text })
+            .where(eq(schema.aiTranscriptions.id, id))
+        } catch (err) {
+          console.error('[ai] failed to persist transcript text', err)
+        }
+      },
+      onError: ({ error }) => {
+        console.error('[ai] transcription stream error', error)
+      },
+    })
+
+    const response = result.toTextStreamResponse()
+    response.headers.set('x-audio-id', id)
+    response.headers.set('x-audio-url', `/api/audios/${id}`)
+    if (durationMs != null) response.headers.set('x-audio-duration-ms', String(durationMs))
+    // The browser hides non-safelisted response headers from JS unless we
+    // explicitly expose them via CORS. The wildcard `*` allowed-origin in
+    // index.ts doesn't auto-expose custom headers — they need to be listed.
+    response.headers.set(
+      'access-control-expose-headers',
+      'x-audio-id, x-audio-url, x-audio-duration-ms',
+    )
+    return response
+  },
+)
 
 // Cap inline vision payload — Claude handles a few images fine but we don't
 // want a runaway selection of 20 photos to balloon the request.

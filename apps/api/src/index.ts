@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ai } from './routes/ai.js'
+import { audios } from './routes/audios.js'
 import { boards } from './routes/boards.js'
 import { images } from './routes/images.js'
 import { models } from './routes/models.js'
@@ -31,6 +32,7 @@ app.route('/api/boards', boards)
 app.route('/api/ai', ai)
 app.route('/api/images', images)
 app.route('/api/videos', videos)
+app.route('/api/audios', audios)
 app.route('/api/settings', settings)
 app.route('/api/models', models)
 

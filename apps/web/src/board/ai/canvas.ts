@@ -90,6 +90,15 @@ export function extractShapeText(editor: Editor, shape: TLShape): string {
       ? `[AI-generated video — prompt: "${props.prompt}"]`
       : '[AI-generated video]'
   }
+  // AI transcription: the transcript itself IS the textual content — surface
+  // it so text-mode follow-ups ("summarize this", "translate this") work.
+  if (shapeType === 'ai-transcription') {
+    const props = shape.props as { transcript?: string; instruction?: string }
+    const head = props.instruction
+      ? `[AI transcription — instruction: "${props.instruction}"]`
+      : '[AI transcription]'
+    return props.transcript ? `${head}\n${props.transcript}` : `${head} (empty)`
+  }
   const props = shape.props as Record<string, unknown>
   if (typeof props.text === 'string') return props.text
   // tldraw v4 stores `note`/`text`/`geo` label content as a TipTap rich-text

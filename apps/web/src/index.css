@@ -151,6 +151,18 @@ body,
   animation: ai-image-float 2.6s ease-in-out infinite;
 }
 
+/* --- AI transcription: waveform-bar animation --- */
+
+@keyframes ai-audio-bar {
+  0%   { transform: scaleY(0.45); }
+  100% { transform: scaleY(1);    }
+}
+
+/* Native audio player tinting — match the indigo theme. */
+.ai-audio {
+  accent-color: #6366f1; /* indigo-500 */
+}
+
 /* --- Laser pointer halo cursor --- */
 
 .laser-cursor {
@@ -269,7 +281,8 @@ body,
   .animate-ai-image-shimmer,
   .animate-ai-image-dot,
   .animate-ai-image-pulse-soft,
-  .animate-ai-image-float {
+  .animate-ai-image-float,
+  [style*="ai-audio-bar"] {
     animation: none !important;
   }
 }

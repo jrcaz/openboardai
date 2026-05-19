@@ -189,7 +189,8 @@ async function loadModelsForModality(
     return { ok: true, data: sortModels(data) }
   }
 
-  // text & image both come from /v1/models, filtered by output_modalities.
+  // text, image, and audio all come from /v1/models. Filter by
+  // output_modalities for text/image; audio requires audio-in / text-out.
   const { status, body } = await fetchUpstream<{ data?: OpenRouterChatModel[] }>(
     '/api/v1/models',
     apiKey,
@@ -201,8 +202,14 @@ async function loadModelsForModality(
   const data: ModelInfo[] = []
   for (const r of raws) {
     if (!r?.id) continue
+    const inputs = normalizeInputs(r.architecture)
     const outputs = normalizeOutputs(r.architecture)
-    if (!outputs.includes(modality)) continue
+    if (modality === 'audio') {
+      if (!inputs.includes('audio')) continue
+      if (!outputs.includes('text')) continue
+    } else if (!outputs.includes(modality)) {
+      continue
+    }
     data.push(normalizeChat(r, modality))
   }
   return { ok: true, data: sortModels(data) }
@@ -213,8 +220,11 @@ models.get('/', async (c) => {
   if (!key) return c.json({ error: 'missing-openrouter-key' }, 401)
 
   const raw = c.req.query('modality')
-  if (raw !== 'text' && raw !== 'image' && raw !== 'video') {
-    return c.json({ error: 'bad-request', message: 'modality must be text|image|video' }, 400)
+  if (raw !== 'text' && raw !== 'image' && raw !== 'video' && raw !== 'audio') {
+    return c.json(
+      { error: 'bad-request', message: 'modality must be text|image|video|audio' },
+      400,
+    )
   }
   const modality: Modality = raw
 
