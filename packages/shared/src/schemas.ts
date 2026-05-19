@@ -116,6 +116,44 @@ export const GenerateVideoResponse = z.object({
 })
 export type GenerateVideoResponse = z.infer<typeof GenerateVideoResponse>
 
+// --- AI html generation ---
+
+export const GenerateHtmlRequest = z.object({
+  boardId: z.string(),
+  prompt: z.string().trim().min(1).max(4000),
+  title: z.string().trim().max(120).optional(),
+  resultShapeId: z.string().optional(),
+  model: z.string().min(1).max(200).optional(),
+})
+export type GenerateHtmlRequest = z.infer<typeof GenerateHtmlRequest>
+
+export const GenerateHtmlResponse = z.object({
+  htmlId: z.string(),
+  url: z.string(),
+  title: z.string(),
+  prompt: z.string(),
+  byteSize: z.number().int().nonnegative(),
+})
+export type GenerateHtmlResponse = z.infer<typeof GenerateHtmlResponse>
+
+// Max characters for an uploaded HTML doc — 2 MB worth of UTF-16 source.
+const MAX_HTML_UPLOAD_CHARS = 2_000_000
+
+export const UploadHtmlRequest = z.object({
+  boardId: z.string(),
+  title: z.string().trim().min(1).max(200),
+  html: z.string().min(1).max(MAX_HTML_UPLOAD_CHARS),
+})
+export type UploadHtmlRequest = z.infer<typeof UploadHtmlRequest>
+
+export const UploadHtmlResponse = z.object({
+  htmlId: z.string(),
+  url: z.string(),
+  title: z.string(),
+  byteSize: z.number().int().nonnegative(),
+})
+export type UploadHtmlResponse = z.infer<typeof UploadHtmlResponse>
+
 // --- OpenRouter model catalog ---
 
 export const Modality = z.enum(['text', 'image', 'video'])

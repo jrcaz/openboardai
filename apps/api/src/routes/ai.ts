@@ -5,22 +5,30 @@ import { zValidator } from '@hono/zod-validator'
 import {
   experimental_generateVideo as generateVideo,
   generateImage,
+  stepCountIs,
   streamText,
+  tool,
   type ModelMessage,
 } from 'ai'
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { z } from 'zod'
 import {
+  GenerateHtmlRequest,
   GenerateImageRequest,
   GenerateRequest,
   GenerateVideoRequest,
+  UploadHtmlRequest,
+  type GenerateHtmlResponse,
   type GenerateImageResponse,
   type GenerateVideoResponse,
   type ImageAspect,
+  type UploadHtmlResponse,
   type VideoAspect,
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
 import { DEFAULTS, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
+import { generateAndPersistHtml, persistUploadedHtml } from '../ai/html.js'
 
 export const ai = new Hono()
 
@@ -45,10 +53,53 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   const imageParts = await resolveContextImages(context?.shapes ?? [])
   const llmMessages = attachImagesToLastUser(messages, imageParts)
 
+  const tools = {
+    create_html: tool({
+      description:
+        "Create a self-contained interactive HTML widget on the canvas alongside your text reply. Use ONLY when the user explicitly asks for HTML, an interactive demo, a chart, a sortable/styled table, a dashboard, or any visual UI that markdown can't express. Single tool call per turn. Continue your text reply after calling the tool — describe what you placed on the canvas.",
+      inputSchema: z.object({
+        title: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe('A short label for the widget (under 8 words).'),
+        prompt: z
+          .string()
+          .min(10)
+          .max(4000)
+          .describe(
+            'Detailed instructions for the HTML generator. Describe the exact widget to build, the data to render, styling, and any interactivity. Be specific.',
+          ),
+      }),
+      execute: async ({ title, prompt }) => {
+        try {
+          const result = await generateAndPersistHtml({
+            openrouter,
+            boardId,
+            prompt,
+            title,
+            model: selected,
+          })
+          return {
+            ok: true as const,
+            htmlId: result.htmlId,
+            title: result.title,
+            url: `/api/htmls/${result.htmlId}`,
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'unknown error'
+          return { ok: false as const, error: message }
+        }
+      },
+    }),
+  }
+
   const result = streamText({
     model: openrouter.chat(selected),
     system: buildSystemPrompt({ mode, context }),
     messages: llmMessages,
+    tools,
+    stopWhen: stepCountIs(3),
     onFinish: async ({ text }) => {
       try {
         await db.insert(schema.aiMessages).values({
@@ -70,7 +121,58 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
     },
   })
 
-  return result.toTextStreamResponse()
+  return result.toUIMessageStreamResponse()
+})
+
+ai.post('/generate-html', zValidator('json', GenerateHtmlRequest), async (c) => {
+  const { openrouter } = requireOpenRouter(c)
+  const { boardId, prompt, title, resultShapeId, model } = c.req.valid('json')
+  const selected = model?.trim() || DEFAULTS.text
+
+  try {
+    const { htmlId, title: resolvedTitle, byteSize } = await generateAndPersistHtml({
+      openrouter,
+      boardId,
+      prompt,
+      title,
+      model: selected,
+      resultShapeId: resultShapeId ?? null,
+    })
+    const body: GenerateHtmlResponse = {
+      htmlId,
+      url: `/api/htmls/${htmlId}`,
+      title: resolvedTitle,
+      prompt,
+      byteSize,
+    }
+    return c.json(body)
+  } catch (err) {
+    console.error('[ai] html generation failed', err)
+    const message = err instanceof Error ? err.message : 'unknown'
+    return c.json({ error: 'html_generation_failed', message }, 500)
+  }
+})
+
+ai.post('/upload-html', zValidator('json', UploadHtmlRequest), async (c) => {
+  const { boardId, title, html } = c.req.valid('json')
+  try {
+    const { htmlId, title: resolvedTitle, byteSize } = await persistUploadedHtml({
+      boardId,
+      title,
+      html,
+    })
+    const body: UploadHtmlResponse = {
+      htmlId,
+      url: `/api/htmls/${htmlId}`,
+      title: resolvedTitle,
+      byteSize,
+    }
+    return c.json(body)
+  } catch (err) {
+    console.error('[ai] html upload failed', err)
+    const message = err instanceof Error ? err.message : 'unknown'
+    return c.json({ error: 'html_upload_failed', message }, 500)
+  }
 })
 
 // Recorded dimensions per aspect — OpenRouter's image SDK ignores `size` and

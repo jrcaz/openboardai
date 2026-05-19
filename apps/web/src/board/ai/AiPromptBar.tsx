@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import type { ImageAspect, VideoAspect } from '@openboard-ai/shared'
 import { useAiGenerate } from './useAiGenerate'
+import { useAiHtmlGenerate } from './useAiHtmlGenerate'
 import { useAiImageGenerate } from './useAiImageGenerate'
 import { useAiVideoGenerate } from './useAiVideoGenerate'
+import { importHtmlFile } from './useAiHtmlImport'
 import { ModelPicker } from './ModelPicker'
 
 interface Props {
@@ -28,6 +30,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
   const { generate } = useAiGenerate(boardId, editor)
   const generateImage = useAiImageGenerate(boardId, editor)
   const generateVideo = useAiVideoGenerate(boardId, editor)
+  const generateHtml = useAiHtmlGenerate(boardId, editor)
 
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
@@ -37,6 +40,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
   const [videoAspect, setVideoAspect] = useState<VideoAspect>('16:9')
   const [generateAudio, setGenerateAudio] = useState(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!editor) return
@@ -89,6 +93,21 @@ export function AiPromptBar({ boardId, editor }: Props) {
     window.addEventListener('ai-image:retry', handleRetry)
     return () => window.removeEventListener('ai-image:retry', handleRetry)
   }, [editor, generateImage, aspect])
+
+  // Listen for "Retry" requests from AI html error footer.
+  useEffect(() => {
+    if (!editor) return
+    async function handleRetry(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      await generateHtml({
+        prompt: detail.prompt,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-html:retry', handleRetry)
+    return () => window.removeEventListener('ai-html:retry', handleRetry)
+  }, [editor, generateHtml])
 
   // Listen for "Retry" requests from AI video error footer.
   useEffect(() => {
@@ -200,9 +219,29 @@ export function AiPromptBar({ boardId, editor }: Props) {
                 {selection.length} selected
               </span>
             ) : null}
+            <ImportHtmlButton
+              disabled={!editor}
+              onPick={() => fileInputRef.current?.click()}
+            />
             <ModelPicker modality={mode} />
           </div>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".html,.htm,text/html"
+          multiple
+          className="hidden"
+          onChange={async (e) => {
+            const files = e.target.files
+            if (!files || !editor) return
+            for (const f of Array.from(files)) {
+              await importHtmlFile(editor, f, { boardId })
+            }
+            // Reset so the same file can be re-selected later.
+            e.target.value = ''
+          }}
+        />
 
         {/* Selection chip when in image mode (separate so toggle row stays clean) */}
         {mode === 'image' && useSelection && (
@@ -434,6 +473,39 @@ function AspectPicker({
         )
       })}
     </div>
+  )
+}
+
+function ImportHtmlButton({
+  disabled,
+  onPick,
+}: {
+  disabled: boolean
+  onPick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onPick}
+      title="Import an HTML file onto the canvas"
+      className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10.5px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 transition hover:bg-white hover:text-violet-700 hover:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <svg
+        className="h-2.5 w-2.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M8 7l-4 5 4 5" />
+        <path d="M16 7l4 5-4 5" />
+        <path d="M14 4l-4 16" />
+      </svg>
+      Import HTML
+    </button>
   )
 }
 
