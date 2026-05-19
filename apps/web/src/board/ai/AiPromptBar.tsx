@@ -195,8 +195,8 @@ export function AiPromptBar({ boardId, editor }: Props) {
                 <AudioToggle value={generateAudio} onChange={setGenerateAudio} />
               </>
             ) : useSelection ? (
-              <span className="flex items-center gap-1.5 text-[11px] font-medium text-violet-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 {selection.length} selected
               </span>
             ) : null}
@@ -206,16 +206,16 @@ export function AiPromptBar({ boardId, editor }: Props) {
 
         {/* Selection chip when in image mode (separate so toggle row stays clean) */}
         {mode === 'image' && useSelection && (
-          <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-violet-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+          <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-orange-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
             Using {selection.length} selected shape{selection.length === 1 ? '' : 's'} as context
           </div>
         )}
 
         {/* Source image / selection chip in video mode */}
         {mode === 'video' && (sourceImageId || useSelection) && (
-          <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-fuchsia-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-500" />
+          <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-amber-900">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-700" />
             {sourceImageId
               ? 'Animating selected image as first frame'
               : `Using ${selection.length} selected shape${selection.length === 1 ? '' : 's'} as context`}
@@ -241,12 +241,12 @@ export function AiPromptBar({ boardId, editor }: Props) {
           <button
             onClick={submit}
             disabled={busy || !value.trim()}
-            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-white shadow-sm transition disabled:cursor-not-allowed disabled:bg-neutral-300 ${
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium shadow-sm transition disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 ${
               mode === 'image'
-                ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700'
+                ? 'bg-gradient-to-r from-orange-300 to-orange-400 text-neutral-900 hover:from-orange-400 hover:to-orange-500'
                 : mode === 'video'
-                ? 'bg-gradient-to-r from-violet-600 to-sky-500 hover:from-violet-700 hover:to-sky-600'
-                : 'bg-violet-600 hover:bg-violet-700'
+                ? 'bg-gradient-to-r from-amber-600 to-amber-800 text-white hover:from-amber-700 hover:to-amber-900'
+                : 'bg-amber-400 text-neutral-900 hover:bg-amber-500'
             }`}
           >
             <span className="flex items-center gap-1.5">
@@ -295,7 +295,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
         onClick={() => onChange('text')}
         className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
           mode === 'text'
-            ? 'bg-white text-violet-700 shadow-sm'
+            ? 'bg-white text-amber-700 shadow-sm'
             : 'text-neutral-500 hover:text-neutral-700'
         }`}
       >
@@ -308,7 +308,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
         onClick={() => onChange('image')}
         className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
           mode === 'image'
-            ? 'bg-white text-fuchsia-700 shadow-sm'
+            ? 'bg-white text-orange-700 shadow-sm'
             : 'text-neutral-500 hover:text-neutral-700'
         }`}
       >
@@ -323,7 +323,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
         onClick={() => onChange('video')}
         className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
           mode === 'video'
-            ? 'bg-white text-sky-700 shadow-sm'
+            ? 'bg-white text-amber-900 shadow-sm'
             : 'text-neutral-500 hover:text-neutral-700'
         }`}
       >
@@ -355,7 +355,7 @@ function VideoAspectPicker({
             title={`${a.label} (${a.value})`}
             className={`flex items-center gap-1 rounded-full px-2 py-0.5 transition ${
               active
-                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
+                ? 'bg-white text-amber-900 shadow-sm ring-1 ring-amber-200'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >
@@ -381,7 +381,7 @@ function AudioToggle({
       title={value ? 'Audio on' : 'Audio off'}
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
         value
-          ? 'bg-white text-sky-700 ring-sky-200 shadow-sm'
+          ? 'bg-white text-amber-900 ring-amber-300 shadow-sm'
           : 'bg-neutral-50 text-neutral-500 ring-neutral-200/60 hover:text-neutral-700'
       }`}
     >
@@ -424,7 +424,7 @@ function AspectPicker({
             title={`${a.label} (${a.value})`}
             className={`flex items-center gap-1 rounded-full px-2 py-0.5 transition ${
               active
-                ? 'bg-white text-fuchsia-700 shadow-sm ring-1 ring-fuchsia-100'
+                ? 'bg-white text-orange-700 shadow-sm ring-1 ring-orange-100'
                 : 'text-neutral-500 hover:text-neutral-700'
             }`}
           >

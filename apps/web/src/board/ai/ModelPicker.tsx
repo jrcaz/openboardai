@@ -8,8 +8,8 @@ interface Props {
   modality: Modality
 }
 
-// Per-modality theme. Mirrors the violet/fuchsia/sky color coding used
-// throughout AiPromptBar so the picker visually belongs to the active mode.
+// Per-modality theme — yellow/amber/orange differentiation in the warm family
+// so the picker visually belongs to the active mode.
 const THEME: Record<
   Modality,
   {
@@ -22,27 +22,27 @@ const THEME: Record<
   }
 > = {
   text: {
-    text: 'text-violet-700',
-    bg: 'bg-violet-50',
-    ring: 'ring-violet-200',
-    chip: 'bg-violet-100 text-violet-700',
-    accent: 'text-violet-600',
+    text: 'text-amber-700',
+    bg: 'bg-yellow-50',
+    ring: 'ring-amber-200',
+    chip: 'bg-yellow-100 text-amber-800',
+    accent: 'text-amber-600',
     label: 'Text',
   },
   image: {
-    text: 'text-fuchsia-700',
-    bg: 'bg-fuchsia-50',
-    ring: 'ring-fuchsia-200',
-    chip: 'bg-fuchsia-100 text-fuchsia-700',
-    accent: 'text-fuchsia-600',
+    text: 'text-orange-700',
+    bg: 'bg-orange-50',
+    ring: 'ring-orange-200',
+    chip: 'bg-orange-100 text-orange-700',
+    accent: 'text-orange-600',
     label: 'Image',
   },
   video: {
-    text: 'text-sky-700',
-    bg: 'bg-sky-50',
-    ring: 'ring-sky-200',
-    chip: 'bg-sky-100 text-sky-700',
-    accent: 'text-sky-600',
+    text: 'text-amber-900',
+    bg: 'bg-amber-50',
+    ring: 'ring-amber-300',
+    chip: 'bg-amber-100 text-amber-900',
+    accent: 'text-amber-800',
     label: 'Video',
   },
 }
@@ -264,10 +264,10 @@ export function ModelPicker({ modality }: Props) {
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${
                 modality === 'text'
-                  ? 'bg-violet-500'
+                  ? 'bg-amber-500'
                   : modality === 'image'
-                  ? 'bg-fuchsia-500'
-                  : 'bg-sky-500'
+                  ? 'bg-orange-500'
+                  : 'bg-amber-800'
               }`}
             />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">

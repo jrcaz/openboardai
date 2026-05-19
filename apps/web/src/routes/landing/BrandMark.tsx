@@ -1,7 +1,7 @@
 export function BrandMark({ size = 32 }: { size?: number }) {
   return (
     <div
-      className="flex items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-sm"
+      className="flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-400 text-neutral-900 shadow-sm"
       style={{ width: size, height: size }}
       aria-hidden="true"
     >

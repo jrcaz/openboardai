@@ -86,7 +86,7 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
 
   const borderClass =
     status === 'generating'
-      ? 'border-violet-300'
+      ? 'border-amber-400'
       : status === 'error'
       ? 'border-red-300'
       : 'border-neutral-200'
@@ -97,7 +97,7 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
       style={{ pointerEvents: 'all', width: w, height: h }}
     >
       <div
-        className={`relative h-full w-full overflow-hidden rounded-2xl border ${borderClass} bg-black shadow-[0_2px_6px_rgba(0,0,0,0.06),0_18px_38px_-18px_rgba(60,40,140,0.28)] transition-colors duration-500`}
+        className={`relative h-full w-full overflow-hidden rounded-2xl border ${borderClass} bg-black shadow-[0_2px_6px_rgba(0,0,0,0.08),0_18px_38px_-18px_rgba(0,0,0,0.4)] transition-colors duration-500`}
       >
         {status !== 'generating' && videoId && (
           <video
@@ -164,7 +164,7 @@ function FilmingLayer({
   const elapsed = useElapsed(startedAt)
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-hidden bg-gradient-to-br from-violet-50 via-fuchsia-50 to-sky-50 animate-ai-image-pulse-soft">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-hidden bg-gradient-to-br from-amber-100 via-amber-50 to-amber-100 animate-ai-image-pulse-soft">
       {/* Diagonal shimmer sweep */}
       <div
         className="pointer-events-none absolute -inset-1/2 animate-ai-image-shimmer bg-gradient-to-br from-transparent via-white/55 to-transparent"
@@ -173,20 +173,20 @@ function FilmingLayer({
 
       {/* Decorative filmstrip silhouette */}
       <div className="pointer-events-none absolute inset-x-6 top-4 flex flex-col gap-1 opacity-30">
-        <div className="h-1 rounded-sm bg-violet-300" />
-        <div className="h-1 rounded-sm bg-violet-200" />
-        <div className="h-1 rounded-sm bg-violet-100" />
+        <div className="h-1 rounded-sm bg-amber-700" />
+        <div className="h-1 rounded-sm bg-amber-500" />
+        <div className="h-1 rounded-sm bg-amber-300" />
       </div>
 
       {/* Center icon stack */}
       <div className="relative z-10 flex flex-col items-center gap-2.5">
-        <div className="animate-ai-image-float relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/75 shadow-[0_4px_18px_-6px_rgba(124,58,237,0.45)] backdrop-blur-sm">
-          <ClapperboardIcon className="h-6 w-6 text-violet-600" />
-          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-fuchsia-500 shadow-[0_0_0_3px_rgba(255,255,255,0.85)] animate-ping" />
+        <div className="animate-ai-image-float relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/75 shadow-[0_4px_18px_-6px_rgba(120,53,15,0.45)] backdrop-blur-sm">
+          <ClapperboardIcon className="h-6 w-6 text-amber-800" />
+          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-700 shadow-[0_0_0_3px_rgba(255,255,255,0.85)] animate-ping" />
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
             Filming
           </span>
           <span className="flex items-end gap-[3px] pl-0.5">
@@ -197,7 +197,7 @@ function FilmingLayer({
         </div>
 
         <span
-          className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-violet-700 shadow-sm ring-1 ring-violet-100"
+          className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-amber-900 shadow-sm ring-1 ring-amber-200"
           title="Veo videos usually arrive in 1–3 min."
         >
           {formatElapsed(elapsed)}
@@ -206,7 +206,7 @@ function FilmingLayer({
 
       {prompt && (
         <p
-          className="relative z-10 max-w-[80%] truncate text-center text-[11px] italic text-violet-900/60"
+          className="relative z-10 max-w-[80%] truncate text-center text-[11px] italic text-amber-900/60"
           title={prompt}
         >
           “{prompt}”
@@ -286,7 +286,7 @@ function formatElapsed(ms: number): string {
 function Dot({ delay }: { delay: string }) {
   return (
     <span
-      className="block h-1.5 w-1.5 rounded-full bg-violet-600 animate-ai-image-dot"
+      className="block h-1.5 w-1.5 rounded-full bg-amber-800 animate-ai-image-dot"
       style={{ animationDelay: delay }}
     />
   )
