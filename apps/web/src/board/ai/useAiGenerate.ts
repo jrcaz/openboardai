@@ -2,8 +2,18 @@ import { useCallback, useRef } from 'react'
 import { type Editor, createShapeId, type TLShape, type TLShapeId } from 'tldraw'
 import type { AiContextShape, ChatMessage, GenerateRequest } from '@openboard-ai/shared'
 import { AI_CARD_TYPE, type AiCardShape } from '../shapes/AiCardShapeUtil'
+import {
+  AI_HTML_TYPE,
+  type AiHtmlShape,
+} from '../shapes/AiHtmlShapeUtil'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
-import { createConnectingArrow, extractImageRef, extractShapeText, pickAnchor } from './canvas'
+import {
+  createConnectingArrow,
+  extractHtmlRef,
+  extractImageRef,
+  extractShapeText,
+  pickAnchor,
+} from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
 import {
   clearModelPreference,
@@ -15,6 +25,9 @@ export type GenerateMode = GenerateRequest['mode']
 
 const CARD_W = 340
 const CARD_H = 240
+const HTML_W = 600
+const HTML_H = 400
+const HTML_GAP = 32
 
 interface GenerateOptions {
   prompt: string
@@ -80,13 +93,19 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       const messages: ChatMessage[] = [{ role: 'user', content: trimmed }]
       const ctx: AiContextShape[] = contextShapes.map((s) => {
         const ref = extractImageRef(editor, s)
+        const htmlRef = extractHtmlRef(s)
         return {
           id: s.id as string,
           type: s.type,
           text: extractShapeText(editor, s).slice(0, 4000),
           ...(ref ? { imageRef: ref } : {}),
+          ...(htmlRef ? { htmlRef } : {}),
         }
       })
+
+      // Track htmlId for each tool call so we can update the right shape when
+      // the tool's output arrives.
+      const toolCallShapes = new Map<string, TLShapeId>()
 
       try {
         const modelPref = getModelPreference('text')
@@ -116,32 +135,128 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
           throw new Error(`HTTP ${res.status}: ${body}`)
         }
 
-        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+        // The server now returns a UI Message Stream (SSE format,
+        // `data: <json>\n\n`). Parse it ourselves rather than pulling
+        // in another helper — we only need a handful of event types.
         let acc = ''
-        let firstChunk = true
+        for await (const chunk of iterateUIMessageChunks(res.body)) {
+          if (chunk.type === 'text-delta' && typeof chunk.delta === 'string') {
+            acc += chunk.delta
+            editor.run(
+              () => {
+                updateCustomShape<AiCardShape>(editor, {
+                  id: cardId,
+                  type: AI_CARD_TYPE,
+                  props: {
+                    text: acc,
+                    status: 'streaming',
+                    h: Math.min(800, Math.max(h, estimateHeight(acc, w))),
+                  },
+                })
+              },
+              { history: 'ignore' },
+            )
+            continue
+          }
 
-        while (true) {
-          const { value, done } = await reader.read()
-          if (done) break
-          if (!value) continue
-          acc += value
+          if (
+            chunk.type === 'tool-input-available' &&
+            chunk.toolName === 'create_html' &&
+            chunk.toolCallId
+          ) {
+            const input = chunk.input as { title?: string; prompt?: string }
+            const htmlShapeId = createShapeId()
+            toolCallShapes.set(chunk.toolCallId, htmlShapeId)
 
-          editor.run(
-            () => {
-              updateCustomShape<AiCardShape>(editor, {
-                id: cardId,
-                type: AI_CARD_TYPE,
-                props: {
-                  text: acc,
-                  status: 'streaming',
-                  h: Math.min(800, Math.max(h, estimateHeight(acc, w))),
-                },
-              })
-            },
-            { history: 'ignore' },
-          )
+            const cardBounds = editor.getShapePageBounds(cardId)
+            const htmlAnchor = cardBounds
+              ? { x: cardBounds.maxX + HTML_GAP, y: cardBounds.minY }
+              : { x: anchor.x + w + HTML_GAP, y: anchor.y }
 
-          if (firstChunk) firstChunk = false
+            editor.run(
+              () => {
+                createCustomShape<AiHtmlShape>(editor, {
+                  id: htmlShapeId,
+                  type: AI_HTML_TYPE,
+                  x: htmlAnchor.x,
+                  y: htmlAnchor.y,
+                  props: {
+                    w: HTML_W,
+                    h: HTML_H,
+                    title: (input.title ?? 'Generating…').slice(0, 120),
+                    prompt: input.prompt ?? null,
+                    source: 'ai',
+                    status: 'generating',
+                    htmlId: null,
+                    errorMessage: null,
+                  },
+                })
+                createConnectingArrow(editor, cardId as string, htmlShapeId)
+              },
+              { history: 'ignore' },
+            )
+            continue
+          }
+
+          if (chunk.type === 'tool-output-available' && chunk.toolCallId) {
+            const htmlShapeId = toolCallShapes.get(chunk.toolCallId)
+            if (!htmlShapeId) continue
+            const output = chunk.output as
+              | { ok: true; htmlId: string; title: string; url: string }
+              | { ok: false; error: string }
+              | undefined
+            if (!output) continue
+
+            editor.run(
+              () => {
+                if (output.ok) {
+                  updateCustomShape<AiHtmlShape>(editor, {
+                    id: htmlShapeId,
+                    type: AI_HTML_TYPE,
+                    props: {
+                      status: 'done',
+                      htmlId: output.htmlId,
+                      title: output.title,
+                    },
+                  })
+                } else {
+                  updateCustomShape<AiHtmlShape>(editor, {
+                    id: htmlShapeId,
+                    type: AI_HTML_TYPE,
+                    props: {
+                      status: 'error',
+                      errorMessage: output.error,
+                    },
+                  })
+                }
+              },
+              { history: 'ignore' },
+            )
+            continue
+          }
+
+          if (chunk.type === 'tool-output-error' && chunk.toolCallId) {
+            const htmlShapeId = toolCallShapes.get(chunk.toolCallId)
+            if (!htmlShapeId) continue
+            editor.run(
+              () => {
+                updateCustomShape<AiHtmlShape>(editor, {
+                  id: htmlShapeId,
+                  type: AI_HTML_TYPE,
+                  props: {
+                    status: 'error',
+                    errorMessage: chunk.errorText ?? 'Tool failed',
+                  },
+                })
+              },
+              { history: 'ignore' },
+            )
+            continue
+          }
+
+          if (chunk.type === 'error') {
+            throw new Error(chunk.errorText ?? 'Stream error')
+          }
         }
 
         editor.run(
@@ -181,6 +296,57 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
   )
 
   return { generate }
+}
+
+type UIMessageChunk = {
+  type: string
+  delta?: string
+  toolCallId?: string
+  toolName?: string
+  input?: unknown
+  output?: unknown
+  errorText?: string
+  [key: string]: unknown
+}
+
+/**
+ * Reads a Vercel AI SDK UI Message Stream (SSE: `data: <json>\n\n`) and
+ * yields each parsed chunk. Resilient to multi-byte boundaries.
+ */
+async function* iterateUIMessageChunks(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<UIMessageChunk> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) {
+      buf += decoder.decode()
+    } else if (value) {
+      buf += decoder.decode(value, { stream: true })
+    } else {
+      continue
+    }
+    // SSE frames are separated by a blank line ("\n\n"). Process complete frames.
+    let idx: number
+    while ((idx = buf.indexOf('\n\n')) >= 0) {
+      const frame = buf.slice(0, idx)
+      buf = buf.slice(idx + 2)
+      const lines = frame.split('\n')
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue
+        const payload = line.slice(5).trimStart()
+        if (!payload || payload === '[DONE]') continue
+        try {
+          yield JSON.parse(payload) as UIMessageChunk
+        } catch (err) {
+          console.warn('[ai] bad UI message chunk', payload.slice(0, 80), err)
+        }
+      }
+    }
+    if (done) break
+  }
 }
 
 function estimateHeight(text: string, width: number): number {
