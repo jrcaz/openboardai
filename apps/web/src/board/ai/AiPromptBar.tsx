@@ -60,20 +60,6 @@ export function AiPromptBar({ boardId, editor }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Listen for "Expand" requests from AI card footer.
-  useEffect(() => {
-    if (!editor) return
-    async function handleExpand(e: Event) {
-      const detail = (e as CustomEvent<{ shapeId: string }>).detail
-      const shape = editor!.getShape(detail.shapeId as never)
-      if (!shape) return
-      const { extractAndExpand } = await import('./expand')
-      await extractAndExpand(editor!, boardId, shape)
-    }
-    window.addEventListener('ai-card:expand', handleExpand)
-    return () => window.removeEventListener('ai-card:expand', handleExpand)
-  }, [editor, boardId])
-
   // Listen for "Retry" requests from AI image error footer.
   useEffect(() => {
     if (!editor) return
