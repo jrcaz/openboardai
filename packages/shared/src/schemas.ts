@@ -147,3 +147,66 @@ export const ModelsResponse = z.object({
   cachedAt: z.number(),
 })
 export type ModelsResponse = z.infer<typeof ModelsResponse>
+
+// --- .obx file format (board save/import) ---
+
+export const OBX_VERSION = 1 as const
+
+export const ObxManifest = z.object({
+  version: z.literal(1),
+  exportedAt: z.string(),
+  originalBoardId: z.string(),
+  title: z.string(),
+  counts: z.object({
+    images: z.number().int().nonnegative(),
+    videos: z.number().int().nonnegative(),
+  }),
+})
+export type ObxManifest = z.infer<typeof ObxManifest>
+
+export const ObxBoard = z.object({
+  title: z.string(),
+  snapshot: z.record(z.unknown()),
+})
+export type ObxBoard = z.infer<typeof ObxBoard>
+
+export const ObxImageMeta = z.object({
+  prompt: z.string(),
+  model: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  mediaType: z.string(),
+})
+export type ObxImageMeta = z.infer<typeof ObxImageMeta>
+
+export const ObxVideoMeta = ObxImageMeta.extend({
+  durationMs: z.number().int().nullable(),
+  hasAudio: z.boolean(),
+  sourceImageId: z.string().nullable(),
+})
+export type ObxVideoMeta = z.infer<typeof ObxVideoMeta>
+
+export const UploadImageRequest = z.object({
+  id: z.string().min(1).max(64),
+  boardId: z.string(),
+  prompt: z.string(),
+  model: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  mediaType: z.string(),
+  bytesBase64: z.string(),
+  resultShapeId: z.string().nullable().optional(),
+})
+export type UploadImageRequest = z.infer<typeof UploadImageRequest>
+
+export const UploadVideoRequest = UploadImageRequest.extend({
+  durationMs: z.number().int().nullable(),
+  hasAudio: z.boolean(),
+  sourceImageId: z.string().nullable(),
+})
+export type UploadVideoRequest = z.infer<typeof UploadVideoRequest>
+
+export const UploadAssetResponse = z.object({
+  id: z.string(),
+})
+export type UploadAssetResponse = z.infer<typeof UploadAssetResponse>
