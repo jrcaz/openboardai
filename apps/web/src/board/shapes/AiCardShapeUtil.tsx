@@ -146,17 +146,6 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
             >
               Copy
             </button>
-            <button
-              onPointerDown={stopEventPropagation}
-              onClick={() => {
-                window.dispatchEvent(
-                  new CustomEvent('ai-card:expand', { detail: { shapeId: shape.id } }),
-                )
-              }}
-              className="rounded bg-amber-400 px-2 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-500"
-            >
-              Expand
-            </button>
           </footer>
         )}
       </div>

@@ -35,8 +35,6 @@ interface GenerateOptions {
   contextShapes?: TLShape[]
   /** Optional explicit anchor; otherwise we pick a sensible spot. */
   anchorAt?: { x: number; y: number }
-  /** Override card size (used for "expand" small cards). */
-  size?: { w: number; h: number }
   /** If true, drop arrows from each contextShape -> created card. */
   connectArrows?: boolean
 }
@@ -50,15 +48,14 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       mode = 'prompt',
       contextShapes = [],
       anchorAt,
-      size,
       connectArrows = false,
     }: GenerateOptions) => {
       if (!editor) return
       const trimmed = prompt.trim()
       if (!trimmed) return
 
-      const w = size?.w ?? CARD_W
-      const h = size?.h ?? CARD_H
+      const w = CARD_W
+      const h = CARD_H
 
       const anchor = anchorAt ?? pickAnchor(editor, contextShapes, w)
 
