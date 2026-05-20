@@ -13,19 +13,22 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^2.0.0-beta.30",
-    "@openboard-ai/shared": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "@hono/zod-validator": "^0.4.2",
+    "@openboard-ai/shared": "workspace:*",
     "@openrouter/ai-sdk-provider": "^2.9.0",
     "ai": "^6.0.0-beta.128",
     "drizzle-orm": "^0.36.4",
+    "fflate": "^0.8.3",
     "hono": "^4.6.13",
     "nanoid": "^5.0.9",
     "postgres": "^3.4.5",
+    "sanitize-html": "^2.17.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/sanitize-html": "^2.16.1",
     "drizzle-kit": "^0.30.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

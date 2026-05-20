@@ -46,6 +46,14 @@ export const AiContextShape = z.object({
       mediaType: z.string().optional(),
     })
     .optional(),
+  // Optional pointer to an HTML widget stored in aiHtmls. The server fetches
+  // the document and inlines it into the system prompt so the model can see
+  // what the widget actually renders.
+  htmlRef: z
+    .object({
+      htmlId: z.string(),
+    })
+    .optional(),
 })
 export type AiContextShape = z.infer<typeof AiContextShape>
 
@@ -119,6 +127,44 @@ export const GenerateVideoResponse = z.object({
 })
 export type GenerateVideoResponse = z.infer<typeof GenerateVideoResponse>
 
+// --- AI html generation ---
+
+export const GenerateHtmlRequest = z.object({
+  boardId: z.string(),
+  prompt: z.string().trim().min(1).max(4000),
+  title: z.string().trim().max(120).optional(),
+  resultShapeId: z.string().optional(),
+  model: z.string().min(1).max(200).optional(),
+})
+export type GenerateHtmlRequest = z.infer<typeof GenerateHtmlRequest>
+
+export const GenerateHtmlResponse = z.object({
+  htmlId: z.string(),
+  url: z.string(),
+  title: z.string(),
+  prompt: z.string(),
+  byteSize: z.number().int().nonnegative(),
+})
+export type GenerateHtmlResponse = z.infer<typeof GenerateHtmlResponse>
+
+// Max characters for an uploaded HTML doc — 2 MB worth of UTF-16 source.
+const MAX_HTML_UPLOAD_CHARS = 2_000_000
+
+export const UploadHtmlRequest = z.object({
+  boardId: z.string(),
+  title: z.string().trim().min(1).max(200),
+  html: z.string().min(1).max(MAX_HTML_UPLOAD_CHARS),
+})
+export type UploadHtmlRequest = z.infer<typeof UploadHtmlRequest>
+
+export const UploadHtmlResponse = z.object({
+  htmlId: z.string(),
+  url: z.string(),
+  title: z.string(),
+  byteSize: z.number().int().nonnegative(),
+})
+export type UploadHtmlResponse = z.infer<typeof UploadHtmlResponse>
+
 // --- OpenRouter model catalog ---
 
 export const Modality = z.enum(['text', 'image', 'video'])
@@ -185,3 +231,66 @@ export const SubAgentsStorage = z.object({
   }),
 })
 export type SubAgentsStorage = z.infer<typeof SubAgentsStorage>
+
+// --- .obx file format (board save/import) ---
+
+export const OBX_VERSION = 1 as const
+
+export const ObxManifest = z.object({
+  version: z.literal(1),
+  exportedAt: z.string(),
+  originalBoardId: z.string(),
+  title: z.string(),
+  counts: z.object({
+    images: z.number().int().nonnegative(),
+    videos: z.number().int().nonnegative(),
+  }),
+})
+export type ObxManifest = z.infer<typeof ObxManifest>
+
+export const ObxBoard = z.object({
+  title: z.string(),
+  snapshot: z.record(z.unknown()),
+})
+export type ObxBoard = z.infer<typeof ObxBoard>
+
+export const ObxImageMeta = z.object({
+  prompt: z.string(),
+  model: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  mediaType: z.string(),
+})
+export type ObxImageMeta = z.infer<typeof ObxImageMeta>
+
+export const ObxVideoMeta = ObxImageMeta.extend({
+  durationMs: z.number().int().nullable(),
+  hasAudio: z.boolean(),
+  sourceImageId: z.string().nullable(),
+})
+export type ObxVideoMeta = z.infer<typeof ObxVideoMeta>
+
+export const UploadImageRequest = z.object({
+  id: z.string().min(1).max(64),
+  boardId: z.string(),
+  prompt: z.string(),
+  model: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  mediaType: z.string(),
+  bytesBase64: z.string(),
+  resultShapeId: z.string().nullable().optional(),
+})
+export type UploadImageRequest = z.infer<typeof UploadImageRequest>
+
+export const UploadVideoRequest = UploadImageRequest.extend({
+  durationMs: z.number().int().nullable(),
+  hasAudio: z.boolean(),
+  sourceImageId: z.string().nullable(),
+})
+export type UploadVideoRequest = z.infer<typeof UploadVideoRequest>
+
+export const UploadAssetResponse = z.object({
+  id: z.string(),
+})
+export type UploadAssetResponse = z.infer<typeof UploadAssetResponse>

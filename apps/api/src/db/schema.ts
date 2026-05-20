@@ -43,6 +43,21 @@ export const aiImages = pgTable('ai_images', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+export const aiHtmls = pgTable('ai_htmls', {
+  id: text('id').primaryKey(),
+  boardId: text('board_id')
+    .references(() => boards.id, { onDelete: 'cascade' })
+    .notNull(),
+  title: text('title').notNull().default('Untitled'),
+  prompt: text('prompt'),
+  source: text('source').notNull(),
+  model: text('model'),
+  byteSize: integer('byte_size').notNull(),
+  bytes: bytea('bytes').notNull(),
+  resultShapeId: text('result_shape_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 export const aiVideos = pgTable('ai_videos', {
   id: text('id').primaryKey(),
   boardId: text('board_id')

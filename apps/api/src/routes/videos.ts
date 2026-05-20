@@ -1,5 +1,8 @@
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
+import { zValidator } from '@hono/zod-validator'
+import { bodyLimit } from 'hono/body-limit'
+import { UploadVideoRequest } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
 
 export const videos = new Hono()
@@ -29,3 +32,41 @@ videos.get('/:id', async (c) => {
     },
   })
 })
+
+videos.post(
+  '/upload',
+  bodyLimit({
+    maxSize: 200 * 1024 * 1024,
+    onError: (c) => c.json({ error: 'payload_too_large' }, 413),
+  }),
+  zValidator('json', UploadVideoRequest),
+  async (c) => {
+    const req = c.req.valid('json')
+
+    const [board] = await db
+      .select({ id: schema.boards.id })
+      .from(schema.boards)
+      .where(eq(schema.boards.id, req.boardId))
+      .limit(1)
+    if (!board) return c.json({ error: 'board_not_found' }, 404)
+
+    const bytes = Buffer.from(req.bytesBase64, 'base64')
+
+    await db.insert(schema.aiVideos).values({
+      id: req.id,
+      boardId: req.boardId,
+      prompt: req.prompt,
+      model: req.model,
+      width: req.width,
+      height: req.height,
+      mediaType: req.mediaType,
+      bytes,
+      resultShapeId: req.resultShapeId ?? null,
+      durationMs: req.durationMs,
+      hasAudio: req.hasAudio,
+      sourceImageId: req.sourceImageId,
+    })
+
+    return c.json({ id: req.id }, 201)
+  },
+)

@@ -9,9 +9,11 @@ import {
 import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
 import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
+import { AiHtmlShapeUtil } from './shapes/AiHtmlShapeUtil'
 import { AiImageShapeUtil } from './shapes/AiImageShapeUtil'
 import { AiVideoShapeUtil } from './shapes/AiVideoShapeUtil'
 import { AiPromptBar } from './ai/AiPromptBar'
+import { importHtmlFile, isHtmlFile } from './ai/useAiHtmlImport'
 import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
@@ -20,8 +22,14 @@ import { SubAgentsButton } from '../settings/SubAgentsButton'
 import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
+import { FileMenu } from './FileMenu'
 
-const customShapeUtils = [AiCardShapeUtil, AiImageShapeUtil, AiVideoShapeUtil]
+const customShapeUtils = [
+  AiCardShapeUtil,
+  AiImageShapeUtil,
+  AiVideoShapeUtil,
+  AiHtmlShapeUtil,
+]
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
@@ -72,6 +80,35 @@ export function BoardEditor({ boardId }: Props) {
       if (initialSnapshotRef.current && !ed.store.has(ed.getCurrentPageId())) {
         loadSnapshot(ed.store, initialSnapshotRef.current)
       }
+
+      // Intercept dropped/pasted .html files and route them to our import
+      // pipeline. Capture tldraw's default `files` handler first so non-html
+      // drops (images, etc.) still work — calling `putExternalContent` here
+      // would recurse back into us.
+      const edHandlers = (
+        ed as unknown as {
+          externalContentHandlers: Record<
+            string,
+            ((info: unknown) => unknown) | null | undefined
+          >
+        }
+      ).externalContentHandlers
+      const defaultFiles = edHandlers?.files ?? null
+
+      ed.registerExternalContentHandler('files', async (info) => {
+        const htmlFiles: File[] = []
+        const otherFiles: File[] = []
+        for (const f of info.files) {
+          if (isHtmlFile(f)) htmlFiles.push(f)
+          else otherFiles.push(f)
+        }
+        for (const f of htmlFiles) {
+          await importHtmlFile(ed, f, { boardId, point: info.point })
+        }
+        if (otherFiles.length > 0 && defaultFiles) {
+          await defaultFiles({ ...info, files: otherFiles } as unknown)
+        }
+      })
 
       const scheduleSave = () => {
         if (saveTimerRef.current != null) clearTimeout(saveTimerRef.current)
@@ -146,6 +183,7 @@ export function BoardEditor({ boardId }: Props) {
       />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
+        <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
         <SubAgentsButton open={agentsDialogOpen} onOpenChange={setAgentsDialogOpen} />
         <SettingsButton />
