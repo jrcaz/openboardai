@@ -60,16 +60,6 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: 'Expand',
-    body: 'Fan four short follow-up cards out from any source shape — arrow-connected back to the original.',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" {...ICON_STROKE}>
-        <circle cx="12" cy="12" r="2.5" />
-        <path d="M12 9V4M12 15v5M9 12H4M15 12h5" />
-      </svg>
-    ),
-  },
-  {
     title: 'Presentation mode',
     body: 'Press P to hide chrome and read like a deck. L drops a laser cursor. Esc exits — no extra tools needed.',
     icon: (
