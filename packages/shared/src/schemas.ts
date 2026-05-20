@@ -46,6 +46,14 @@ export const AiContextShape = z.object({
       mediaType: z.string().optional(),
     })
     .optional(),
+  // Optional pointer to an HTML widget stored in aiHtmls. The server fetches
+  // the document and inlines it into the system prompt so the model can see
+  // what the widget actually renders.
+  htmlRef: z
+    .object({
+      htmlId: z.string(),
+    })
+    .optional(),
 })
 export type AiContextShape = z.infer<typeof AiContextShape>
 

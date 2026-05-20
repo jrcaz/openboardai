@@ -7,7 +7,13 @@ import {
   type AiHtmlShape,
 } from '../shapes/AiHtmlShapeUtil'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
-import { createConnectingArrow, extractImageRef, extractShapeText, pickAnchor } from './canvas'
+import {
+  createConnectingArrow,
+  extractHtmlRef,
+  extractImageRef,
+  extractShapeText,
+  pickAnchor,
+} from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
 import {
   clearModelPreference,
@@ -87,11 +93,13 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       const messages: ChatMessage[] = [{ role: 'user', content: trimmed }]
       const ctx: AiContextShape[] = contextShapes.map((s) => {
         const ref = extractImageRef(editor, s)
+        const htmlRef = extractHtmlRef(s)
         return {
           id: s.id as string,
           type: s.type,
           text: extractShapeText(editor, s).slice(0, 4000),
           ...(ref ? { imageRef: ref } : {}),
+          ...(htmlRef ? { htmlRef } : {}),
         }
       })
 
