@@ -125,6 +125,96 @@ export function AiPromptBar({ boardId, editor }: Props) {
     return () => window.removeEventListener('ai-video:retry', handleRetry)
   }, [editor, generateVideo, videoAspect, generateAudio])
 
+  // Listen for "Edit prompt" requests from AI text cards.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      const shape = editor!.getShape(detail.shapeId as TLShapeId) as
+        | { props: { sourceShapeIds?: string[] } }
+        | undefined
+      const ctxIds = shape?.props.sourceShapeIds ?? []
+      const ctxShapes = ctxIds
+        .map((id) => editor!.getShape(id as TLShapeId))
+        .filter((s): s is TLShape => !!s)
+      await generate({
+        prompt: detail.prompt,
+        mode: ctxShapes.length > 0 ? 'selection-qa' : 'prompt',
+        contextShapes: ctxShapes,
+        connectArrows: false,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-card:edit', handleEdit)
+    return () => window.removeEventListener('ai-card:edit', handleEdit)
+  }, [editor, generate])
+
+  // Listen for "Edit prompt" requests from AI image shapes.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      const shape = editor!.getShape(detail.shapeId as TLShapeId) as
+        | { props: { aspect?: ImageAspect } }
+        | undefined
+      const reuseAspect = shape?.props.aspect ?? aspect
+      await generateImage({
+        prompt: detail.prompt,
+        aspect: reuseAspect,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-image:edit', handleEdit)
+    return () => window.removeEventListener('ai-image:edit', handleEdit)
+  }, [editor, generateImage, aspect])
+
+  // Listen for "Edit prompt" requests from AI video shapes.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      const shape = editor!.getShape(detail.shapeId as TLShapeId) as
+        | {
+            props: {
+              aspect?: VideoAspect
+              hasAudio?: boolean
+              sourceImageId?: string | null
+            }
+          }
+        | undefined
+      const reuseAspect = shape?.props.aspect ?? videoAspect
+      const reuseAudio = shape?.props.hasAudio ?? generateAudio
+      const reuseSource = shape?.props.sourceImageId ?? undefined
+      await generateVideo({
+        prompt: detail.prompt,
+        aspect: reuseAspect,
+        generateAudio: reuseAudio,
+        sourceImageId: reuseSource,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-video:edit', handleEdit)
+    return () => window.removeEventListener('ai-video:edit', handleEdit)
+  }, [editor, generateVideo, videoAspect, generateAudio])
+
+  // Listen for "Edit prompt" requests from AI HTML shapes.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      await generateHtml({
+        prompt: detail.prompt,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-html:edit', handleEdit)
+    return () => window.removeEventListener('ai-html:edit', handleEdit)
+  }, [editor, generateHtml])
+
   // In video mode with exactly one selected ai-image, treat it as source frame.
   const sourceImageId = useMemo(() => {
     if (mode !== 'video') return undefined
