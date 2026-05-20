@@ -3,6 +3,7 @@ import { type Editor, createShapeId, type TLShape, type TLShapeId } from 'tldraw
 import type {
   GenerateVideoRequest,
   GenerateVideoResponse,
+  SubAgent,
   VideoAspect,
 } from '@openboard-ai/shared'
 import { AI_VIDEO_TYPE, type AiVideoShape } from '../shapes/AiVideoShapeUtil'
@@ -25,6 +26,8 @@ interface GenerateVideoOptions {
   connectArrows?: boolean
   /** Reuse an existing shape (used by Retry). */
   reuseShapeId?: TLShapeId
+  /** Custom sub-agent — prepends `systemPrompt` to the user prompt and overrides model. */
+  agent?: SubAgent | null
 }
 
 const CANVAS_DIMS_FOR: Record<VideoAspect, { w: number; h: number }> = {
@@ -42,10 +45,17 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
       contextShapes = [],
       connectArrows = false,
       reuseShapeId,
+      agent = null,
     }: GenerateVideoOptions) => {
       if (!editor) return
-      const trimmed = prompt.trim()
-      if (!trimmed) return
+      const userPrompt = prompt.trim()
+      if (!userPrompt) return
+
+      // Video endpoints have no system message, so the agent's system prompt
+      // is folded into the prompt itself as a template prefix for the API call.
+      const apiPrompt = agent?.systemPrompt?.trim()
+        ? `${agent.systemPrompt.trim()}\n\n${userPrompt}`
+        : userPrompt
 
       const dims = CANVAS_DIMS_FOR[aspect]
       const shapeId = reuseShapeId ?? createShapeId()
@@ -57,7 +67,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
             id: reuseShapeId,
             type: AI_VIDEO_TYPE,
             props: {
-              prompt: trimmed,
+              prompt: userPrompt,
               status: 'generating',
               videoId: null,
               mediaType: null,
@@ -79,7 +89,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
             props: {
               w: dims.w,
               h: dims.h,
-              prompt: trimmed,
+              prompt: userPrompt,
               status: 'generating',
               videoId: null,
               mediaType: null,
@@ -100,6 +110,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
 
       try {
         const modelPref = getModelPreference('video')
+        const resolvedModel = agent?.model?.trim() || modelPref
         const res = await fetch('/api/ai/generate-video', {
           method: 'POST',
           headers: {
@@ -108,12 +119,12 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
           },
           body: JSON.stringify({
             boardId,
-            prompt: trimmed,
+            prompt: apiPrompt,
             aspect,
             generateAudio,
             ...(sourceImageId ? { sourceImageId } : {}),
             resultShapeId: shapeId as string,
-            ...(modelPref ? { model: modelPref } : {}),
+            ...(resolvedModel ? { model: resolvedModel } : {}),
           } satisfies GenerateVideoRequest),
         })
 

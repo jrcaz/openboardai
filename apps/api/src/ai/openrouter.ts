@@ -33,8 +33,13 @@ Your responses appear as cards on the canvas, so:
 export function buildSystemPrompt(opts: {
   mode: 'prompt' | 'selection-qa' | 'expand'
   context?: { shapes: AiContextShape[] }
+  agentSystemPrompt?: string
 }): string {
-  const lines = [BASE_PROMPT]
+  // When a custom agent supplies its own persona/instructions, use those in
+  // place of the default canvas-card prompt so the agent's voice isn't
+  // fighting our concise-card defaults. The mode line and selection block
+  // are still appended below so selection + vision continue to work.
+  const lines = [opts.agentSystemPrompt?.trim() || BASE_PROMPT]
 
   if (opts.mode === 'expand') {
     lines.push(

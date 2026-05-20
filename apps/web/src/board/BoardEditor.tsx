@@ -18,6 +18,7 @@ import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
 import { SettingsButton } from '../settings/SettingsButton'
+import { SubAgentsButton } from '../settings/SubAgentsButton'
 import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
@@ -40,6 +41,7 @@ export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [agentsDialogOpen, setAgentsDialogOpen] = useState(false)
   const initialSnapshotRef = useRef<TLStoreSnapshot | null>(null)
   const loadedRef = useRef(false)
   const saveTimerRef = useRef<number | null>(null)
@@ -183,6 +185,7 @@ export function BoardEditor({ boardId }: Props) {
         <GitHubBadge />
         <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
+        <SubAgentsButton open={agentsDialogOpen} onOpenChange={setAgentsDialogOpen} />
         <SettingsButton />
         <PresentationToggle
           editor={editor}
@@ -198,7 +201,11 @@ export function BoardEditor({ boardId }: Props) {
             : ''
         }`}
       >
-        <AiPromptBar boardId={boardId} editor={editor} />
+        <AiPromptBar
+          boardId={boardId}
+          editor={editor}
+          onOpenAgents={() => setAgentsDialogOpen(true)}
+        />
       </div>
     </div>
   )

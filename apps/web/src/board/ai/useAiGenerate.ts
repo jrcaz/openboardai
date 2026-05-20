@@ -1,6 +1,11 @@
 import { useCallback, useRef } from 'react'
 import { type Editor, createShapeId, type TLShape, type TLShapeId } from 'tldraw'
-import type { AiContextShape, ChatMessage, GenerateRequest } from '@openboard-ai/shared'
+import type {
+  AiContextShape,
+  ChatMessage,
+  GenerateRequest,
+  SubAgent,
+} from '@openboard-ai/shared'
 import { AI_CARD_TYPE, type AiCardShape } from '../shapes/AiCardShapeUtil'
 import {
   AI_HTML_TYPE,
@@ -39,6 +44,8 @@ interface GenerateOptions {
   size?: { w: number; h: number }
   /** If true, drop arrows from each contextShape -> created card. */
   connectArrows?: boolean
+  /** Custom sub-agent to apply: overrides model + adds system prompt + sampling. */
+  agent?: SubAgent | null
 }
 
 export function useAiGenerate(boardId: string, editor: Editor | null) {
@@ -52,6 +59,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       anchorAt,
       size,
       connectArrows = false,
+      agent = null,
     }: GenerateOptions) => {
       if (!editor) return
       const trimmed = prompt.trim()
@@ -109,6 +117,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
       try {
         const modelPref = getModelPreference('text')
+        const resolvedModel = agent?.model?.trim() || modelPref
         const res = await fetch('/api/ai/generate', {
           method: 'POST',
           headers: {
@@ -121,7 +130,10 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
             mode,
             context: ctx.length > 0 ? { shapes: ctx } : undefined,
             resultShapeId: cardId as string,
-            ...(modelPref ? { model: modelPref } : {}),
+            ...(resolvedModel ? { model: resolvedModel } : {}),
+            ...(agent?.systemPrompt ? { agentSystemPrompt: agent.systemPrompt } : {}),
+            ...(typeof agent?.temperature === 'number' ? { temperature: agent.temperature } : {}),
+            ...(typeof agent?.maxTokens === 'number' ? { maxTokens: agent.maxTokens } : {}),
           } satisfies GenerateRequest),
         })
 
