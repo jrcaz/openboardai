@@ -31,18 +31,12 @@ Your responses appear as cards on the canvas, so:
 - You have a tool \`create_html\` that places an interactive HTML widget on the canvas alongside your text reply. Use it ONLY when the user explicitly asks for HTML, an interactive demo, a chart/graph, a styled table, a dashboard, or a small web UI. Do NOT use it for ordinary explanations, summaries, or markdown lists — reply with plain text/markdown as today.`
 
 export function buildSystemPrompt(opts: {
-  mode: 'prompt' | 'selection-qa' | 'expand'
+  mode: 'prompt' | 'selection-qa'
   context?: { shapes: AiContextShape[] }
 }): string {
   const lines = [BASE_PROMPT]
 
-  if (opts.mode === 'expand') {
-    lines.push(
-      '',
-      'MODE: expand. Generate exactly 4 short, distinct, complementary follow-up ideas based on the source.',
-      'Format your reply as a markdown numbered list (1. 2. 3. 4.) with one short phrase per item — no extra commentary.',
-    )
-  } else if (opts.mode === 'selection-qa') {
+  if (opts.mode === 'selection-qa') {
     lines.push('', 'MODE: selection Q&A. The user has selected one or more shapes; answer in reference to them.')
   }
 

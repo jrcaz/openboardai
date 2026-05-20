@@ -12,7 +12,7 @@ const STEPS = [
   {
     step: '03',
     title: 'Iterate',
-    body: 'Use Expand to fan out follow-ups, presentation mode to demo, and snapshots so nothing is lost between sessions.',
+    body: 'Use presentation mode to demo, and snapshots so nothing is lost between sessions.',
   },
 ]
 

@@ -1,6 +1,6 @@
 # OpenBoard AI
 
-An AI-native infinite whiteboard. Drop shapes on a canvas, select them, and ask Claude to reason about, expand, or generate alongside them — text, images, and video all land back on the board as movable, persistent objects.
+An AI-native infinite whiteboard. Drop shapes on a canvas, select them, and ask Claude to reason about or generate alongside them — text, images, and video all land back on the board as movable, persistent objects.
 
 > **Status:** early / pre-1.0. Single-user, single-board-per-id, no realtime collaboration yet.
 
@@ -12,7 +12,6 @@ An AI-native infinite whiteboard. Drop shapes on a canvas, select them, and ask 
 - **Selection-aware context** — Selected shapes (sticky notes, text, geo, images, prior AI cards) are sent as context. Vision-capable for `image` and `ai-image` shapes.
 - **AI images** — Generate via Google Gemini 2.5 Flash Image (configurable). 1:1, 16:9, 9:16 aspects.
 - **AI video** — Generate via Google Veo 3.1 Fast (configurable). Text-to-video or image-to-video, with optional audio.
-- **Expand** — Fan four short follow-up cards out from any source shape, arrow-connected back.
 - **Presentation mode** — Press `P` to hide chrome; `L` for laser pointer; `Esc` to exit.
 - **Snapshots** — Boards persist to Postgres on every change; reload restores the canvas.
 - **BYOK** — Each user supplies their own OpenRouter API key in-app (stored in `localStorage`, sent per-request). The server never holds a key.

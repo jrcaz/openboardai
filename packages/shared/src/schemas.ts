@@ -60,7 +60,7 @@ export type AiContextShape = z.infer<typeof AiContextShape>
 export const GenerateRequest = z.object({
   boardId: z.string(),
   messages: z.array(ChatMessage).min(1).max(50),
-  mode: z.enum(['prompt', 'selection-qa', 'expand']).default('prompt'),
+  mode: z.enum(['prompt', 'selection-qa']).default('prompt'),
   context: z
     .object({
       shapes: z.array(AiContextShape).max(20).default([]),
