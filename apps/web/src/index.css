@@ -249,6 +249,14 @@ body,
 }
 .lp-pill-float { animation: lp-pill-float 3s ease-in-out infinite; }
 
+@keyframes lp-html-drop {
+  0%   { opacity: 0; transform: translate(-12px, -22px) rotate(-6deg); }
+  20%  { opacity: 1; }
+  70%  { opacity: 1; transform: translate(8px, 6px) rotate(-2deg); }
+  100% { opacity: 0; transform: translate(12px, 14px) rotate(-2deg); }
+}
+.lp-html-drop { animation: lp-html-drop 4.2s ease-in-out infinite; }
+
 .lp-dot-grid {
   background-image: radial-gradient(circle, #d4d4d8 1px, transparent 1.5px);
   background-size: 22px 22px;
@@ -266,6 +274,7 @@ body,
   .lp-shimmer-bar,
   .lp-caret,
   .lp-pill-float,
+  .lp-html-drop,
   .animate-ai-image-shimmer,
   .animate-ai-image-dot,
   .animate-ai-image-pulse-soft,
