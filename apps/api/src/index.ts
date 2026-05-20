@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ai } from './routes/ai.js'
 import { boards } from './routes/boards.js'
+import { htmls } from './routes/htmls.js'
 import { images } from './routes/images.js'
 import { models } from './routes/models.js'
 import { settings } from './routes/settings.js'
@@ -31,6 +32,7 @@ app.route('/api/boards', boards)
 app.route('/api/ai', ai)
 app.route('/api/images', images)
 app.route('/api/videos', videos)
+app.route('/api/htmls', htmls)
 app.route('/api/settings', settings)
 app.route('/api/models', models)
 
