@@ -90,6 +90,24 @@ export function extractShapeText(editor: Editor, shape: TLShape): string {
       ? `[AI-generated video — prompt: "${props.prompt}"]`
       : '[AI-generated video]'
   }
+  // ai-html widgets render an embedded iframe; surface title + originating
+  // prompt as the text caption. The full HTML source is attached separately
+  // via `extractHtmlRef` so the server can inline it into the system prompt.
+  if (shapeType === 'ai-html') {
+    const props = shape.props as {
+      title?: string
+      prompt?: string | null
+      source?: 'ai' | 'upload'
+      status?: string
+    }
+    const label = props.source === 'upload' ? 'Uploaded HTML' : 'AI-generated HTML'
+    const parts: string[] = [`[${label} widget — title: "${props.title ?? 'Untitled'}"]`]
+    if (props.prompt) parts.push(`Originating prompt: ${props.prompt}`)
+    if (props.status && props.status !== 'done') {
+      parts.push(`(status: ${props.status} — no rendered content available yet)`)
+    }
+    return parts.join('\n')
+  }
   const props = shape.props as Record<string, unknown>
   if (typeof props.text === 'string') return props.text
   // tldraw v4 stores `note`/`text`/`geo` label content as a TipTap rich-text
@@ -136,4 +154,16 @@ export function extractImageRef(
     }
   }
   return undefined
+}
+
+/**
+ * If `shape` is a finished ai-html widget, return a ref the server can resolve
+ * to the stored HTML bytes (so the LLM can read what the widget renders).
+ * Returns undefined while the widget is still generating or errored.
+ */
+export function extractHtmlRef(shape: TLShape): { htmlId: string } | undefined {
+  if ((shape.type as string) !== 'ai-html') return undefined
+  const props = shape.props as { htmlId?: string | null; status?: string }
+  if (!props.htmlId || props.status !== 'done') return undefined
+  return { htmlId: props.htmlId }
 }
