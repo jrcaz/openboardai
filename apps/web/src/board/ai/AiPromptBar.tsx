@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import type { ImageAspect, VideoAspect } from '@openboard-ai/shared'
 import { useAiGenerate } from './useAiGenerate'
@@ -41,6 +41,13 @@ export function AiPromptBar({ boardId, editor }: Props) {
   const [generateAudio, setGenerateAudio] = useState(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
 
   useEffect(() => {
     if (!editor) return
@@ -261,7 +268,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
             rows={1}
             placeholder={placeholder}
             disabled={busy}
-            className="max-h-40 min-h-[36px] flex-1 resize-none rounded-lg border-0 bg-transparent px-2 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none disabled:opacity-50"
+            className="max-h-[40vh] min-h-[36px] flex-1 resize-none overflow-y-auto rounded-lg border-0 bg-transparent px-2 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none disabled:opacity-50"
           />
           <button
             onClick={submit}
