@@ -75,6 +75,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
             text: '',
             status: 'pending',
             sourceShapeIds: sourceIds,
+            title: null,
           },
         })
 
