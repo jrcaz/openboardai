@@ -88,6 +88,7 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
               sourceImageId: sourceImageId ?? null,
               errorMessage: null,
               startedAt,
+              title: null,
             },
           })
           if (connectArrows) {
