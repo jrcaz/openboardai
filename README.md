@@ -117,8 +117,17 @@ All optional — defaults in `.env.example` work out of the box.
 | `OPENROUTER_APP_URL` | `http://localhost:5173` | Sent as `HTTP-Referer` to OpenRouter |
 | `OPENROUTER_IMAGE_MODEL` | `google/gemini-2.5-flash-image` | Image model id |
 | `OPENROUTER_VIDEO_MODEL` | `google/veo-3.1-fast` | Video model id |
+| `BOARD_TTL_DAYS` | _(unset)_ | If set to a positive integer, boards are auto-deleted that many days after creation. Useful for capping storage cost on shared / free-tier deployments. Unset = boards persist forever. |
 
 There is intentionally **no** server-side `OPENROUTER_API_KEY` — every request carries the user's key.
+
+### Auto-deletion of boards
+
+When `BOARD_TTL_DAYS` is set, the API runs a cleanup job on startup and every 6 hours that deletes any board whose `created_at` is older than the configured TTL. Cascading foreign keys remove the board's AI messages, images, videos, and HTML widgets in the same step.
+
+- Expiry is measured from **creation**, not last edit — editing a board does not extend its lifetime.
+- When TTL is active, the editor shows a banner with the exact expiry date and a reminder to use **File → Export** (`.obx`) to preserve work. Exported boards can be re-imported via the same menu.
+- Navigating to a board that has already been deleted shows a friendly "this board isn't available" screen rather than a generic error.
 
 ---
 

@@ -7,13 +7,15 @@ import {
   loadSnapshot,
 } from 'tldraw'
 import 'tldraw/tldraw.css'
-import { api } from '../lib/api'
+import type { BoardResponse } from '@openboard-ai/shared'
+import { ApiError, api } from '../lib/api'
 import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
 import { AiHtmlShapeUtil } from './shapes/AiHtmlShapeUtil'
 import { AiImageShapeUtil } from './shapes/AiImageShapeUtil'
 import { AiVideoShapeUtil } from './shapes/AiVideoShapeUtil'
 import { AiPromptBar } from './ai/AiPromptBar'
 import { importHtmlFile, isHtmlFile } from './ai/useAiHtmlImport'
+import { ExpiryBanner } from './ExpiryBanner'
 import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
@@ -40,6 +42,11 @@ export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [notFound, setNotFound] = useState(false)
+  const [boardMeta, setBoardMeta] = useState<Pick<
+    BoardResponse,
+    'createdAt' | 'expiresAt'
+  > | null>(null)
   const initialSnapshotRef = useRef<TLStoreSnapshot | null>(null)
   const loadedRef = useRef(false)
   const saveTimerRef = useRef<number | null>(null)
@@ -56,12 +63,20 @@ export function BoardEditor({ boardId }: Props) {
         if (board.snapshot && Object.keys(board.snapshot).length > 0) {
           initialSnapshotRef.current = board.snapshot as unknown as TLStoreSnapshot
         }
+        setBoardMeta({ createdAt: board.createdAt, expiresAt: board.expiresAt })
         loadedRef.current = true
         // Force a render to mount <Tldraw> with the snapshot prop.
         setEditor((e) => e)
         forceMount()
       })
-      .catch((err) => setLoadError((err as Error).message))
+      .catch((err) => {
+        if (cancelled) return
+        if (err instanceof ApiError && err.status === 404) {
+          setNotFound(true)
+        } else {
+          setLoadError((err as Error).message)
+        }
+      })
     return () => {
       cancelled = true
     }
@@ -151,6 +166,25 @@ export function BoardEditor({ boardId }: Props) {
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
 
+  if (notFound) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-neutral-700">
+        <div className="text-base font-medium">This board isn't available</div>
+        <div className="max-w-md text-neutral-500">
+          It may have expired. Boards are automatically deleted after a set number of days to
+          keep this open-source instance free to host — export to <code>.obx</code> to keep your
+          work next time.
+        </div>
+        <a
+          href="/"
+          className="mt-2 rounded-md border border-neutral-300 px-3 py-1.5 text-neutral-800 hover:bg-neutral-50"
+        >
+          Back to home
+        </a>
+      </div>
+    )
+  }
+
   if (loadError) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-red-600">
@@ -179,6 +213,13 @@ export function BoardEditor({ boardId }: Props) {
         onMount={handleMount}
         licenseKey={TLDRAW_LICENSE_KEY || undefined}
       />
+      {boardMeta?.expiresAt && !isPresenting && (
+        <ExpiryBanner
+          boardId={boardId}
+          createdAt={boardMeta.createdAt}
+          expiresAt={boardMeta.expiresAt}
+        />
+      )}
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
         <FileMenu editor={editor} boardId={boardId} />
