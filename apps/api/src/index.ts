@@ -6,6 +6,7 @@ import { logger } from 'hono/logger'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { startBoardCleanupJob } from './jobs/boardCleanup.js'
 import { ai } from './routes/ai.js'
 import { boards } from './routes/boards.js'
 import { htmls } from './routes/htmls.js'
@@ -55,3 +56,5 @@ const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001)
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`[api] listening on http://localhost:${info.port}`)
 })
+
+startBoardCleanupJob()

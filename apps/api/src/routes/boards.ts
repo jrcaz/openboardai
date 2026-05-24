@@ -11,8 +11,11 @@ import {
   type ObxVideoMeta,
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
+import { getBoardTtlDays } from '../jobs/boardCleanup.js'
 
 export const boards = new Hono()
+
+const MS_PER_DAY = 86_400_000
 
 function extFromMediaType(mediaType: string): string {
   const m = mediaType.toLowerCase()
@@ -162,11 +165,16 @@ boards.delete('/:id/assets', async (c) => {
 })
 
 function serialize(row: typeof schema.boards.$inferSelect) {
+  const ttlDays = getBoardTtlDays()
+  const expiresAt = ttlDays
+    ? new Date(row.createdAt.getTime() + ttlDays * MS_PER_DAY).toISOString()
+    : null
   return {
     id: row.id,
     title: row.title,
     snapshot: row.snapshot,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    expiresAt,
   }
 }

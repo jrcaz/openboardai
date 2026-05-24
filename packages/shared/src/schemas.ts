@@ -21,6 +21,9 @@ export const BoardResponse = z.object({
   snapshot: z.record(z.unknown()).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  // ISO timestamp when this board will be auto-deleted, or null when the
+  // server has no TTL configured (BOARD_TTL_DAYS unset).
+  expiresAt: z.string().nullable(),
 })
 export type BoardResponse = z.infer<typeof BoardResponse>
 

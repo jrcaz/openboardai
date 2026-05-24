@@ -7,10 +7,21 @@ import type {
   UploadVideoRequest,
 } from '@openboard-ai/shared'
 
+export class ApiError extends Error {
+  status: number
+  body: string
+  constructor(status: number, body: string) {
+    super(`HTTP ${status}: ${body}`)
+    this.name = 'ApiError'
+    this.status = status
+    this.body = body
+  }
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    throw new Error(`HTTP ${res.status}: ${body}`)
+    throw new ApiError(res.status, body)
   }
   return res.json() as Promise<T>
 }
@@ -40,7 +51,7 @@ export const api = {
     const res = await fetch(`/api/boards/${id}/export`)
     if (!res.ok) {
       const body = await res.text().catch(() => '')
-      throw new Error(`HTTP ${res.status}: ${body}`)
+      throw new ApiError(res.status, body)
     }
     return res.blob()
   },
