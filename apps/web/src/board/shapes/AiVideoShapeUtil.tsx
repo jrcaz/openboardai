@@ -10,6 +10,7 @@ import {
   useValue,
 } from 'tldraw'
 import { TitleField } from './TitleField'
+import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
 
 export const AI_VIDEO_TYPE = 'ai-video' as const
 
@@ -90,6 +91,8 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
   const [videoLoaded, setVideoLoaded] = useState(false)
   const [muted, setMuted] = useState(true)
   const [editingTitle, setEditingTitle] = useState(false)
+  const [isHovered, setHovered] = useState(false)
+  const [isEditing, setEditing] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const isSelected = useValue(
     'ai-video-selected',
@@ -105,6 +108,8 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
       ? 'border-red-300'
       : 'border-neutral-200'
 
+  const showPencil = status === 'done' && videoLoaded && isHovered && !isEditing
+
   return (
     <HTMLContainer
       id={shape.id}
@@ -112,6 +117,8 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
     >
       <div
         className={`relative h-full w-full overflow-hidden rounded-2xl border ${borderClass} bg-black shadow-[0_2px_6px_rgba(0,0,0,0.08),0_18px_38px_-18px_rgba(0,0,0,0.4)] transition-colors duration-500`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         {status !== 'generating' && videoId && (
           <video
@@ -184,6 +191,30 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
               {prompt}
             </p>
           </div>
+        )}
+
+        {showPencil && (
+          <PencilButton
+            accent="video"
+            onClick={() => setEditing(true)}
+            className={`absolute z-10 ${hasAudio ? 'right-11 top-2' : 'right-2 top-2'}`}
+          />
+        )}
+
+        {isEditing && (
+          <EditPromptOverlay
+            initialPrompt={prompt}
+            accent="video"
+            onCancel={() => setEditing(false)}
+            onSubmit={(newPrompt) => {
+              setEditing(false)
+              window.dispatchEvent(
+                new CustomEvent('ai-video:edit', {
+                  detail: { shapeId: shape.id, prompt: newPrompt },
+                }),
+              )
+            }}
+          />
         )}
       </div>
     </HTMLContainer>
