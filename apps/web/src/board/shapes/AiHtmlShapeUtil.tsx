@@ -9,6 +9,7 @@ import {
   useEditor,
   useValue,
 } from 'tldraw'
+import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
 
 export const AI_HTML_TYPE = 'ai-html' as const
 
@@ -76,6 +77,8 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
   // click buttons, scroll, etc. inside the embedded doc. Default off so the
   // shape can be selected/dragged on the canvas.
   const [isInteracting, setInteracting] = useState(false)
+  const [isHovered, setHovered] = useState(false)
+  const [isEditing, setEditing] = useState(false)
 
   // Selecting the shape implies the user wants to manipulate it on the canvas
   // — drop interact mode whenever this shape leaves the selection.
@@ -108,6 +111,14 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
       ? 'border-violet-400 ring-2 ring-violet-200'
       : 'border-neutral-200'
 
+  const showPencil =
+    source === 'ai' &&
+    status === 'done' &&
+    !!prompt &&
+    isHovered &&
+    !isEditing &&
+    !isInteracting
+
   return (
     <HTMLContainer
       id={shape.id}
@@ -116,6 +127,8 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
       <div
         ref={containerRef}
         className={`relative flex h-full w-full flex-col overflow-hidden rounded-2xl border ${borderClass} bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06),0_18px_38px_-18px_rgba(76,29,149,0.28)] transition-colors duration-300`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         <HeaderBar
           title={title}
@@ -160,6 +173,30 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
               message={errorMessage}
               shapeId={shape.id}
               source={source}
+            />
+          )}
+
+          {showPencil && (
+            <PencilButton
+              accent="violet"
+              onClick={() => setEditing(true)}
+              className="absolute right-2 top-2 z-10"
+            />
+          )}
+
+          {isEditing && prompt && (
+            <EditPromptOverlay
+              initialPrompt={prompt}
+              accent="violet"
+              onCancel={() => setEditing(false)}
+              onSubmit={(newPrompt) => {
+                setEditing(false)
+                window.dispatchEvent(
+                  new CustomEvent('ai-html:edit', {
+                    detail: { shapeId: shape.id, prompt: newPrompt },
+                  }),
+                )
+              }}
             />
           )}
         </div>
