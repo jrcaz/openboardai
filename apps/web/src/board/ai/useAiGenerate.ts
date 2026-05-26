@@ -67,6 +67,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
       if (reuseShapeId) {
         // Reset existing card (Edit flow): back to pending state, drop text.
+        // Title is left alone — it may have been user-set and remains valid.
         editor.run(() => {
           updateCustomShape<AiCardShape>(editor, {
             id: reuseShapeId,
@@ -93,6 +94,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
               text: '',
               status: 'pending',
               sourceShapeIds: sourceIds,
+              title: null,
             },
           })
 

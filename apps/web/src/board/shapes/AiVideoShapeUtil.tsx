@@ -6,7 +6,10 @@ import {
   T,
   type TLBaseShape,
   stopEventPropagation,
+  useEditor,
+  useValue,
 } from 'tldraw'
+import { TitleField } from './TitleField'
 import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
 
 export const AI_VIDEO_TYPE = 'ai-video' as const
@@ -29,6 +32,7 @@ export type AiVideoShape = TLBaseShape<
     errorMessage: string | null
     /** Epoch ms when generation began — used by the elapsed timer. */
     startedAt: number | null
+    title: string | null
   }
 >
 
@@ -47,6 +51,7 @@ export class AiVideoShapeUtil extends BaseBoxShapeUtil<AiVideoShape> {
     sourceImageId: T.string.nullable(),
     errorMessage: T.string.nullable(),
     startedAt: T.number.nullable(),
+    title: T.string.nullable(),
   }
 
   override getDefaultProps(): AiVideoShape['props'] {
@@ -62,6 +67,7 @@ export class AiVideoShapeUtil extends BaseBoxShapeUtil<AiVideoShape> {
       sourceImageId: null,
       errorMessage: null,
       startedAt: null,
+      title: null,
     }
   }
 
@@ -79,13 +85,21 @@ export class AiVideoShapeUtil extends BaseBoxShapeUtil<AiVideoShape> {
 }
 
 function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
-  const { w, h, prompt, status, videoId, hasAudio, errorMessage, startedAt } =
+  const editor = useEditor()
+  const { w, h, prompt, status, videoId, hasAudio, errorMessage, startedAt, title } =
     shape.props
   const [videoLoaded, setVideoLoaded] = useState(false)
   const [muted, setMuted] = useState(true)
+  const [editingTitle, setEditingTitle] = useState(false)
   const [isHovered, setHovered] = useState(false)
   const [isEditing, setEditing] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const isSelected = useValue(
+    'ai-video-selected',
+    () => editor.getSelectedShapeIds().includes(shape.id),
+    [editor, shape.id],
+  )
+  const showTitleBar = !!title || isSelected || editingTitle
 
   const borderClass =
     status === 'generating'
@@ -143,6 +157,28 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
           >
             {muted ? <MutedIcon className="h-3.5 w-3.5" /> : <SoundIcon className="h-3.5 w-3.5" />}
           </button>
+        )}
+
+        {/* Optional user-set title — shows always when set, or as a faint
+            placeholder when the card is selected and untitled. Right padding
+            leaves room for the mute pill at top-right. */}
+        {showTitleBar && (
+          <div className="absolute inset-x-0 top-0 z-10 flex items-center bg-gradient-to-b from-black/65 via-black/25 to-transparent py-2 pl-3 pr-11">
+            <TitleField<AiVideoShape>
+              editor={editor}
+              shapeId={shape.id}
+              shapeType={AI_VIDEO_TYPE}
+              title={title}
+              prompt={prompt}
+              emptyLabel={
+                <span className="italic opacity-70">Add title</span>
+              }
+              placeholder="Add a title"
+              displayClassName={`block w-full truncate text-[12px] font-semibold leading-snug text-white drop-shadow cursor-text ${title ? '' : 'opacity-80'}`}
+              inputClassName="block w-full truncate rounded bg-white/95 px-1.5 py-0.5 text-[12px] font-semibold text-neutral-800 outline-none ring-1 ring-amber-300 focus:ring-amber-500"
+              onEditingChange={setEditingTitle}
+            />
+          </div>
         )}
 
         {/* Prompt caption shown after video loads (small, bottom-left). */}
