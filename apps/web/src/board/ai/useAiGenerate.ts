@@ -37,6 +37,8 @@ interface GenerateOptions {
   anchorAt?: { x: number; y: number }
   /** If true, drop arrows from each contextShape -> created card. */
   connectArrows?: boolean
+  /** Reuse an existing card (used by Edit). Skips creation + arrows. */
+  reuseShapeId?: TLShapeId
 }
 
 export function useAiGenerate(boardId: string, editor: Editor | null) {
@@ -49,6 +51,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       contextShapes = [],
       anchorAt,
       connectArrows = false,
+      reuseShapeId,
     }: GenerateOptions) => {
       if (!editor) return
       const trimmed = prompt.trim()
@@ -59,31 +62,47 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
       const anchor = anchorAt ?? pickAnchor(editor, contextShapes, w)
 
-      const cardId = createShapeId()
+      const cardId = reuseShapeId ?? createShapeId()
       const sourceIds = contextShapes.map((s) => s.id as string)
 
-      editor.run(() => {
-        createCustomShape<AiCardShape>(editor, {
-          id: cardId,
-          type: AI_CARD_TYPE,
-          x: anchor.x,
-          y: anchor.y,
-          props: {
-            w,
-            h,
-            prompt: trimmed,
-            text: '',
-            status: 'pending',
-            sourceShapeIds: sourceIds,
-          },
+      if (reuseShapeId) {
+        // Reset existing card (Edit flow): back to pending state, drop text.
+        editor.run(() => {
+          updateCustomShape<AiCardShape>(editor, {
+            id: reuseShapeId,
+            type: AI_CARD_TYPE,
+            props: {
+              prompt: trimmed,
+              text: '',
+              status: 'pending',
+              sourceShapeIds: sourceIds,
+            },
+          })
         })
+      } else {
+        editor.run(() => {
+          createCustomShape<AiCardShape>(editor, {
+            id: cardId,
+            type: AI_CARD_TYPE,
+            x: anchor.x,
+            y: anchor.y,
+            props: {
+              w,
+              h,
+              prompt: trimmed,
+              text: '',
+              status: 'pending',
+              sourceShapeIds: sourceIds,
+            },
+          })
 
-        if (connectArrows) {
-          for (const src of contextShapes) {
-            createConnectingArrow(editor, src.id, cardId)
+          if (connectArrows) {
+            for (const src of contextShapes) {
+              createConnectingArrow(editor, src.id, cardId)
+            }
           }
-        }
-      })
+        })
+      }
 
       inFlight.current.add(cardId)
 
