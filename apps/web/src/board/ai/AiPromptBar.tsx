@@ -7,6 +7,7 @@ import { useAiImageGenerate } from './useAiImageGenerate'
 import { useAiVideoGenerate } from './useAiVideoGenerate'
 import { importHtmlFile } from './useAiHtmlImport'
 import { ModelPicker } from './ModelPicker'
+import { useAutoConnectArrows } from './useAutoConnectArrows'
 
 interface Props {
   boardId: string
@@ -39,6 +40,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
   const [aspect, setAspect] = useState<ImageAspect>('1:1')
   const [videoAspect, setVideoAspect] = useState<VideoAspect>('16:9')
   const [generateAudio, setGenerateAudio] = useState(true)
+  const { enabled: autoConnect, toggle: toggleAutoConnect } = useAutoConnectArrows()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -166,7 +168,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
           prompt,
           aspect,
           contextShapes: useSelection ? selection : [],
-          connectArrows: useSelection,
+          connectArrows: useSelection && autoConnect,
         })
       } else if (mode === 'video') {
         await generateVideo({
@@ -174,16 +176,15 @@ export function AiPromptBar({ boardId, editor }: Props) {
           aspect: videoAspect,
           generateAudio,
           sourceImageId,
-          // Always draw arrows from selected sources when present (mirrors image flow).
           contextShapes: useSelection ? selection : [],
-          connectArrows: useSelection,
+          connectArrows: useSelection && autoConnect,
         })
       } else {
         await generate({
           prompt,
           mode: useSelection ? 'selection-qa' : 'prompt',
           contextShapes: useSelection ? selection : [],
-          connectArrows: useSelection,
+          connectArrows: useSelection && autoConnect,
         })
       }
     } finally {
@@ -212,6 +213,9 @@ export function AiPromptBar({ boardId, editor }: Props) {
                 {selection.length} selected
               </span>
             ) : null}
+            {useSelection && (
+              <AutoConnectToggle value={autoConnect} onChange={toggleAutoConnect} />
+            )}
             <ImportHtmlButton
               disabled={!editor}
               onPick={() => fileInputRef.current?.click()}
@@ -434,6 +438,46 @@ function AudioToggle({
         )}
       </svg>
       {value ? 'Audio' : 'Mute'}
+    </button>
+  )
+}
+
+function AutoConnectToggle({
+  value,
+  onChange,
+}: {
+  value: boolean
+  onChange: () => void
+}) {
+  return (
+    <button
+      onClick={onChange}
+      title={
+        value
+          ? 'Auto-connect arrows from selected shapes'
+          : "Don't auto-connect arrows"
+      }
+      aria-pressed={value}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
+        value
+          ? 'bg-white text-amber-900 ring-amber-300 shadow-sm'
+          : 'bg-neutral-50 text-neutral-500 ring-neutral-200/60 hover:text-neutral-700'
+      }`}
+    >
+      <svg
+        className="h-2.5 w-2.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M5 19L19 5" />
+        <path d="M13 5h6v6" />
+        {!value && <path d="M4 4l16 16" />}
+      </svg>
+      {value ? 'Link' : 'No link'}
     </button>
   )
 }
