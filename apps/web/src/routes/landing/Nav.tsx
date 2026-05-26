@@ -18,6 +18,9 @@ export function LandingNav() {
           <a href="#how" className="hidden rounded-md px-2 py-1 transition hover:text-neutral-900 sm:inline">
             How it works
           </a>
+          <a href="#faq" className="hidden rounded-md px-2 py-1 transition hover:text-neutral-900 sm:inline">
+            FAQ
+          </a>
           <a
             href={GITHUB_URL}
             target="_blank"
