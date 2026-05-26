@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import type { ImageAspect, VideoAspect } from '@openboard-ai/shared'
 import { useAiGenerate } from './useAiGenerate'
@@ -7,6 +7,7 @@ import { useAiImageGenerate } from './useAiImageGenerate'
 import { useAiVideoGenerate } from './useAiVideoGenerate'
 import { importHtmlFile } from './useAiHtmlImport'
 import { ModelPicker } from './ModelPicker'
+import { useAutoConnectArrows } from './useAutoConnectArrows'
 
 interface Props {
   boardId: string
@@ -39,8 +40,16 @@ export function AiPromptBar({ boardId, editor }: Props) {
   const [aspect, setAspect] = useState<ImageAspect>('1:1')
   const [videoAspect, setVideoAspect] = useState<VideoAspect>('16:9')
   const [generateAudio, setGenerateAudio] = useState(true)
+  const { enabled: autoConnect, toggle: toggleAutoConnect } = useAutoConnectArrows()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
 
   useEffect(() => {
     if (!editor) return
@@ -125,6 +134,96 @@ export function AiPromptBar({ boardId, editor }: Props) {
     return () => window.removeEventListener('ai-video:retry', handleRetry)
   }, [editor, generateVideo, videoAspect, generateAudio])
 
+  // Listen for "Edit prompt" requests from AI text cards.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      const shape = editor!.getShape(detail.shapeId as TLShapeId) as
+        | { props: { sourceShapeIds?: string[] } }
+        | undefined
+      const ctxIds = shape?.props.sourceShapeIds ?? []
+      const ctxShapes = ctxIds
+        .map((id) => editor!.getShape(id as TLShapeId))
+        .filter((s): s is TLShape => !!s)
+      await generate({
+        prompt: detail.prompt,
+        mode: ctxShapes.length > 0 ? 'selection-qa' : 'prompt',
+        contextShapes: ctxShapes,
+        connectArrows: false,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-card:edit', handleEdit)
+    return () => window.removeEventListener('ai-card:edit', handleEdit)
+  }, [editor, generate])
+
+  // Listen for "Edit prompt" requests from AI image shapes.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      const shape = editor!.getShape(detail.shapeId as TLShapeId) as
+        | { props: { aspect?: ImageAspect } }
+        | undefined
+      const reuseAspect = shape?.props.aspect ?? aspect
+      await generateImage({
+        prompt: detail.prompt,
+        aspect: reuseAspect,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-image:edit', handleEdit)
+    return () => window.removeEventListener('ai-image:edit', handleEdit)
+  }, [editor, generateImage, aspect])
+
+  // Listen for "Edit prompt" requests from AI video shapes.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      const shape = editor!.getShape(detail.shapeId as TLShapeId) as
+        | {
+            props: {
+              aspect?: VideoAspect
+              hasAudio?: boolean
+              sourceImageId?: string | null
+            }
+          }
+        | undefined
+      const reuseAspect = shape?.props.aspect ?? videoAspect
+      const reuseAudio = shape?.props.hasAudio ?? generateAudio
+      const reuseSource = shape?.props.sourceImageId ?? undefined
+      await generateVideo({
+        prompt: detail.prompt,
+        aspect: reuseAspect,
+        generateAudio: reuseAudio,
+        sourceImageId: reuseSource,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-video:edit', handleEdit)
+    return () => window.removeEventListener('ai-video:edit', handleEdit)
+  }, [editor, generateVideo, videoAspect, generateAudio])
+
+  // Listen for "Edit prompt" requests from AI HTML shapes.
+  useEffect(() => {
+    if (!editor) return
+    async function handleEdit(e: Event) {
+      const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
+      if (!detail?.shapeId || !detail.prompt) return
+      await generateHtml({
+        prompt: detail.prompt,
+        reuseShapeId: detail.shapeId as TLShapeId,
+      })
+    }
+    window.addEventListener('ai-html:edit', handleEdit)
+    return () => window.removeEventListener('ai-html:edit', handleEdit)
+  }, [editor, generateHtml])
+
   // In video mode with exactly one selected ai-image, treat it as source frame.
   const sourceImageId = useMemo(() => {
     if (mode !== 'video') return undefined
@@ -159,7 +258,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
           prompt,
           aspect,
           contextShapes: useSelection ? selection : [],
-          connectArrows: useSelection,
+          connectArrows: useSelection && autoConnect,
         })
       } else if (mode === 'video') {
         await generateVideo({
@@ -167,16 +266,15 @@ export function AiPromptBar({ boardId, editor }: Props) {
           aspect: videoAspect,
           generateAudio,
           sourceImageId,
-          // Always draw arrows from selected sources when present (mirrors image flow).
           contextShapes: useSelection ? selection : [],
-          connectArrows: useSelection,
+          connectArrows: useSelection && autoConnect,
         })
       } else {
         await generate({
           prompt,
           mode: useSelection ? 'selection-qa' : 'prompt',
           contextShapes: useSelection ? selection : [],
-          connectArrows: useSelection,
+          connectArrows: useSelection && autoConnect,
         })
       }
     } finally {
@@ -205,6 +303,9 @@ export function AiPromptBar({ boardId, editor }: Props) {
                 {selection.length} selected
               </span>
             ) : null}
+            {useSelection && (
+              <AutoConnectToggle value={autoConnect} onChange={toggleAutoConnect} />
+            )}
             <ImportHtmlButton
               disabled={!editor}
               onPick={() => fileInputRef.current?.click()}
@@ -261,7 +362,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
             rows={1}
             placeholder={placeholder}
             disabled={busy}
-            className="max-h-40 min-h-[36px] flex-1 resize-none rounded-lg border-0 bg-transparent px-2 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none disabled:opacity-50"
+            className="max-h-[40vh] min-h-[36px] flex-1 resize-none overflow-y-auto rounded-lg border-0 bg-transparent px-2 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none disabled:opacity-50"
           />
           <button
             onClick={submit}
@@ -427,6 +528,46 @@ function AudioToggle({
         )}
       </svg>
       {value ? 'Audio' : 'Mute'}
+    </button>
+  )
+}
+
+function AutoConnectToggle({
+  value,
+  onChange,
+}: {
+  value: boolean
+  onChange: () => void
+}) {
+  return (
+    <button
+      onClick={onChange}
+      title={
+        value
+          ? 'Auto-connect arrows from selected shapes'
+          : "Don't auto-connect arrows"
+      }
+      aria-pressed={value}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
+        value
+          ? 'bg-white text-amber-900 ring-amber-300 shadow-sm'
+          : 'bg-neutral-50 text-neutral-500 ring-neutral-200/60 hover:text-neutral-700'
+      }`}
+    >
+      <svg
+        className="h-2.5 w-2.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M5 19L19 5" />
+        <path d="M13 5h6v6" />
+        {!value && <path d="M4 4l16 16" />}
+      </svg>
+      {value ? 'Link' : 'No link'}
     </button>
   )
 }

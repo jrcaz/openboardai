@@ -89,6 +89,18 @@ const FEATURES: Feature[] = [
       </svg>
     ),
   },
+  {
+    title: 'HTML widgets',
+    body: 'Generate interactive HTML from a prompt, or drop an .html file on the canvas. Renders in a sandboxed iframe; double-click to interact.',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" {...ICON_STROKE}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M9 10l-2 2 2 2" />
+        <path d="M15 10l2 2-2 2" />
+        <path d="M13 9l-2 6" />
+      </svg>
+    ),
+  },
 ]
 
 export function Features() {

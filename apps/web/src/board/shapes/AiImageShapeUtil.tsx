@@ -10,6 +10,7 @@ import {
   useValue,
 } from 'tldraw'
 import { TitleField } from './TitleField'
+import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
 
 export const AI_IMAGE_TYPE = 'ai-image' as const
 
@@ -77,6 +78,8 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
   const { w, h, prompt, status, imageId, errorMessage, title } = shape.props
   const [imgLoaded, setImgLoaded] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
+  const [isHovered, setHovered] = useState(false)
+  const [isEditing, setEditing] = useState(false)
   const isSelected = useValue(
     'ai-image-selected',
     () => editor.getSelectedShapeIds().includes(shape.id),
@@ -91,6 +94,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
       : 'border-neutral-200'
 
   const showTitleBar = !!title || isSelected || editingTitle
+  const showPencil = status === 'done' && imgLoaded && isHovered && !isEditing
 
   return (
     <HTMLContainer
@@ -99,6 +103,8 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
     >
       <div
         className={`relative h-full w-full overflow-hidden rounded-2xl border ${borderClass} bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06),0_18px_38px_-18px_rgba(120,53,15,0.28)] transition-colors duration-500`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         {/* The image — fades in once loaded. Always mounted in done/error so swap is seamless. */}
         {status !== 'generating' && imageId && (
@@ -149,6 +155,30 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
               {prompt}
             </p>
           </div>
+        )}
+
+        {showPencil && (
+          <PencilButton
+            accent="orange"
+            onClick={() => setEditing(true)}
+            className="absolute right-2 top-2 z-10"
+          />
+        )}
+
+        {isEditing && (
+          <EditPromptOverlay
+            initialPrompt={prompt}
+            accent="orange"
+            onCancel={() => setEditing(false)}
+            onSubmit={(newPrompt) => {
+              setEditing(false)
+              window.dispatchEvent(
+                new CustomEvent('ai-image:edit', {
+                  detail: { shapeId: shape.id, prompt: newPrompt },
+                }),
+              )
+            }}
+          />
         )}
       </div>
     </HTMLContainer>
