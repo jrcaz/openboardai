@@ -11,6 +11,7 @@ import {
   stopEventPropagation,
 } from 'tldraw'
 import { updateCustomShape } from './customShape'
+import { TitleField } from './TitleField'
 import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
 
 export const AI_CARD_TYPE = 'ai-card' as const
@@ -24,6 +25,7 @@ export type AiCardShape = TLBaseShape<
     text: string
     status: 'pending' | 'streaming' | 'done' | 'error'
     sourceShapeIds: string[]
+    title: string | null
   }
 >
 
@@ -37,6 +39,7 @@ export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
     text: T.string,
     status: T.literalEnum('pending', 'streaming', 'done', 'error'),
     sourceShapeIds: T.arrayOf(T.string),
+    title: T.string.nullable(),
   }
 
   override getDefaultProps(): AiCardShape['props'] {
@@ -47,6 +50,7 @@ export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
       text: '',
       status: 'pending',
       sourceShapeIds: [],
+      title: null,
     }
   }
 
@@ -64,7 +68,7 @@ export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
 }
 
 function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor }) {
-  const { prompt, text, status, w, h } = shape.props
+  const { prompt, text, status, w, h, title } = shape.props
   const cardRef = useRef<HTMLDivElement>(null)
   const [isHovered, setHovered] = useState(false)
   const [isEditing, setEditing] = useState(false)
@@ -122,12 +126,17 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
             <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-amber-400 text-[10px] font-semibold text-amber-950">
               AI
             </span>
-            <span
-              className="flex-1 truncate text-xs font-medium text-neutral-700"
-              title={prompt}
-            >
-              {prompt || 'AI response'}
-            </span>
+            <TitleField<AiCardShape>
+              editor={editor}
+              shapeId={shape.id}
+              shapeType={AI_CARD_TYPE}
+              title={title}
+              prompt={prompt}
+              emptyLabel={prompt || 'AI response'}
+              placeholder="Add a title"
+              displayClassName="flex-1 truncate text-xs font-medium text-neutral-700 cursor-text"
+              inputClassName="flex-1 min-w-0 truncate rounded bg-white/80 px-1 py-0.5 text-xs font-medium text-neutral-800 outline-none ring-1 ring-amber-300 focus:ring-amber-500"
+            />
             <StatusDot status={status} />
           </header>
 

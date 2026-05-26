@@ -74,6 +74,7 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
               mediaType: null,
               aspect,
               errorMessage: null,
+              title: null,
             },
           })
           if (connectArrows) {

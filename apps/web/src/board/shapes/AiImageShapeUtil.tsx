@@ -6,7 +6,10 @@ import {
   T,
   type TLBaseShape,
   stopEventPropagation,
+  useEditor,
+  useValue,
 } from 'tldraw'
+import { TitleField } from './TitleField'
 import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
 
 export const AI_IMAGE_TYPE = 'ai-image' as const
@@ -24,6 +27,7 @@ export type AiImageShape = TLBaseShape<
     mediaType: string | null
     aspect: '1:1' | '16:9' | '9:16'
     errorMessage: string | null
+    title: string | null
   }
 >
 
@@ -39,6 +43,7 @@ export class AiImageShapeUtil extends BaseBoxShapeUtil<AiImageShape> {
     mediaType: T.string.nullable(),
     aspect: T.literalEnum('1:1', '16:9', '9:16'),
     errorMessage: T.string.nullable(),
+    title: T.string.nullable(),
   }
 
   override getDefaultProps(): AiImageShape['props'] {
@@ -51,6 +56,7 @@ export class AiImageShapeUtil extends BaseBoxShapeUtil<AiImageShape> {
       mediaType: null,
       aspect: '1:1',
       errorMessage: null,
+      title: null,
     }
   }
 
@@ -68,10 +74,17 @@ export class AiImageShapeUtil extends BaseBoxShapeUtil<AiImageShape> {
 }
 
 function AiImageComponent({ shape }: { shape: AiImageShape }) {
-  const { w, h, prompt, status, imageId, errorMessage } = shape.props
+  const editor = useEditor()
+  const { w, h, prompt, status, imageId, errorMessage, title } = shape.props
   const [imgLoaded, setImgLoaded] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
   const [isHovered, setHovered] = useState(false)
   const [isEditing, setEditing] = useState(false)
+  const isSelected = useValue(
+    'ai-image-selected',
+    () => editor.getSelectedShapeIds().includes(shape.id),
+    [editor, shape.id],
+  )
 
   const borderClass =
     status === 'generating'
@@ -80,6 +93,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
       ? 'border-red-300'
       : 'border-neutral-200'
 
+  const showTitleBar = !!title || isSelected || editingTitle
   const showPencil = status === 'done' && imgLoaded && isHovered && !isEditing
 
   return (
@@ -108,6 +122,27 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
 
         {status === 'error' && (
           <ErrorLayer prompt={prompt} message={errorMessage} shapeId={shape.id} />
+        )}
+
+        {/* Optional user-set title — shows always when set, or as a faint
+            placeholder when the card is selected and untitled. */}
+        {showTitleBar && (
+          <div className="absolute inset-x-0 top-0 z-10 flex items-center bg-gradient-to-b from-black/55 via-black/20 to-transparent px-3 py-2">
+            <TitleField<AiImageShape>
+              editor={editor}
+              shapeId={shape.id}
+              shapeType={AI_IMAGE_TYPE}
+              title={title}
+              prompt={prompt}
+              emptyLabel={
+                <span className="italic opacity-70">Add title</span>
+              }
+              placeholder="Add a title"
+              displayClassName={`block w-full truncate text-[12px] font-semibold leading-snug text-white drop-shadow cursor-text ${title ? '' : 'opacity-80'}`}
+              inputClassName="block w-full truncate rounded bg-white/95 px-1.5 py-0.5 text-[12px] font-semibold text-neutral-800 outline-none ring-1 ring-orange-300 focus:ring-orange-500"
+              onEditingChange={setEditingTitle}
+            />
+          </div>
         )}
 
         {/* Subtle prompt caption shown after image loads (small, bottom-left). */}
