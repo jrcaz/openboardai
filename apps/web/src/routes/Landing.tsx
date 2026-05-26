@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { LandingNav } from './landing/Nav'
 import { Hero } from './landing/Hero'
 import { Features } from './landing/Features'
+import { HtmlWidgets } from './landing/HtmlWidgets'
 import { HowItWorks } from './landing/HowItWorks'
 import { ByokCallout } from './landing/ByokCallout'
 import { LandingFooter } from './landing/Footer'
@@ -62,6 +63,7 @@ export function Landing() {
       <main>
         <Hero onStart={handleStart} starting={creating} />
         <Features />
+        <HtmlWidgets />
         <HowItWorks />
         <ByokCallout onStart={handleStart} starting={creating} />
       </main>
