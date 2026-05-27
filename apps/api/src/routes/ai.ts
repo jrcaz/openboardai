@@ -34,6 +34,24 @@ import { userOwnsBoard } from '../lib/ownership.js'
 
 export const ai = new Hono<AuthEnv>()
 
+// tldraw's default color palette — the valid `color` values for native
+// arrow/geo/text annotation shapes.
+const ANNOTATE_COLORS = [
+  'black',
+  'grey',
+  'light-violet',
+  'violet',
+  'blue',
+  'light-blue',
+  'yellow',
+  'orange',
+  'green',
+  'light-green',
+  'light-red',
+  'red',
+  'white',
+] as const
+
 function requireOpenRouter(c: Context) {
   const key = c.req.header('x-openrouter-key')?.trim()
   if (!key) {
@@ -105,6 +123,51 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
         } catch (err) {
           const message = err instanceof Error ? err.message : 'unknown error'
           return { ok: false as const, error: message }
+        }
+      },
+    }),
+    annotate: tool({
+      description:
+        'Mark up EXISTING shapes already on the canvas: point at them with arrows, draw an outline box/ellipse around them, add a text callout near them, or highlight them. Use this whenever the user asks to point out, mark, highlight, circle, box, label, or annotate something already on the board. Target shapes by their id from the board shape index in the system prompt — never invent ids. You may include multiple annotations in one call. Continue your text reply after calling the tool, describing what you marked.',
+      inputSchema: z.object({
+        annotations: z
+          .array(
+            z.object({
+              kind: z
+                .enum(['arrow', 'box', 'ellipse', 'callout', 'highlight'])
+                .describe(
+                  'arrow=point at the shape; box/ellipse=outline around it; callout=text note near it; highlight=highlighter stroke over it.',
+                ),
+              targetId: z
+                .string()
+                .describe(
+                  'The id of the EXISTING shape to annotate, copied verbatim from the board shape index.',
+                ),
+              label: z
+                .string()
+                .max(120)
+                .optional()
+                .describe(
+                  'Short text. Required for "callout"; optional caption for "arrow". Ignored for box/ellipse/highlight.',
+                ),
+              color: z
+                .enum(ANNOTATE_COLORS)
+                .default('red')
+                .describe('Annotation color. Defaults to red for visibility.'),
+            }),
+          )
+          .min(1)
+          .max(12)
+          .describe('One or more annotations to draw on existing shapes.'),
+      }),
+      execute: async ({ annotations }) => {
+        // No server-side editor — the drawing happens client-side from the
+        // tool-input-available stream event. Validate + acknowledge so the
+        // model gets a tool result and can continue its text reply.
+        return {
+          ok: true as const,
+          count: annotations.length,
+          kinds: annotations.map((a) => a.kind),
         }
       },
     }),
