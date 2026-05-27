@@ -90,7 +90,8 @@ export function AiPromptBar({ boardId, editor }: Props) {
         requestAnimationFrame(() =>
           inputRef.current?.focus({ preventScroll: true })
         )
-      } else if (mod && e.key === '.') {
+      } else if (mod && e.key === '\\') {
+        // ⌘. is reserved by tldraw (Toggle Focus Mode), so use ⌘\ for show/hide.
         e.preventDefault()
         setCollapsed((c) => {
           if (!c) inputRef.current?.blur()
@@ -706,7 +707,7 @@ function CollapseButton({
     <button
       type="button"
       onClick={onClick}
-      title={`Hide input bar (${modKey}.)`}
+      title={`Hide input bar (${modKey}\\)`}
       aria-label="Hide AI input bar"
       className="group inline-flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 active:scale-90"
     >
@@ -756,7 +757,7 @@ function CollapsedPill({
         type="button"
         onClick={onExpand}
         tabIndex={visible ? 0 : -1}
-        title={`Show input bar (${modKey}.)`}
+        title={`Show input bar (${modKey}K)`}
         aria-label="Show AI input bar"
         className={`pointer-events-auto group inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/95 py-2 pl-3 pr-4 text-[12px] font-medium text-neutral-700 shadow-[0_4px_20px_-6px_rgba(0,0,0,0.18)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.22)] active:scale-[0.98] ${
           visible ? 'scale-100' : 'scale-90'
