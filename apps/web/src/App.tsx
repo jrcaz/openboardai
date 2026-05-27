@@ -4,6 +4,7 @@ import { BoardPage } from './routes/Board'
 import { Dashboard } from './routes/Dashboard'
 import { Login } from './routes/Login'
 import { Signup } from './routes/Signup'
+import { PublicBoardViewer } from './board/PublicBoardViewer'
 import { AuthGate } from './components/AuthGate'
 import { ApiKeyProvider } from './settings/useApiKey'
 import { ApiKeyGate } from './settings/ApiKeyGate'
@@ -29,6 +30,7 @@ export function App() {
               </ApiKeyGate>
             </AuthGate>
           </Route>
+          <Route path="/p/:token" component={PublicBoardViewer} />
           <Route>
             <div className="p-6 text-sm text-neutral-600">Not found.</div>
           </Route>
