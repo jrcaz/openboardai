@@ -1,7 +1,12 @@
+import { Link } from 'wouter'
 import { BrandMark } from './BrandMark'
 import { GITHUB_URL } from './links'
+import { useSession } from '../../lib/auth-client'
+import { UserMenu } from '../../components/UserMenu'
 
 export function LandingNav() {
+  const { data: session, isPending } = useSession()
+
   return (
     <header className="absolute inset-x-0 top-0 z-20">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
@@ -32,6 +37,30 @@ export function LandingNav() {
             </svg>
             GitHub
           </a>
+
+          {isPending ? null : session ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="hidden rounded-md px-2 py-1 transition hover:text-neutral-900 sm:inline"
+              >
+                Dashboard
+              </Link>
+              <UserMenu />
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="rounded-md px-2 py-1 transition hover:text-neutral-900">
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center rounded-lg bg-neutral-900 px-3 py-1.5 font-semibold text-white transition hover:bg-neutral-800"
+              >
+                Sign up
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>
