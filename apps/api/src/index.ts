@@ -13,6 +13,7 @@ import { boards } from './routes/boards.js'
 import { htmls } from './routes/htmls.js'
 import { images } from './routes/images.js'
 import { models } from './routes/models.js'
+import { publicBoards } from './routes/public.js'
 import { settings } from './routes/settings.js'
 import { videos } from './routes/videos.js'
 
@@ -49,6 +50,11 @@ app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
 // e.g. which social providers are enabled. Registered before requireAuth so it
 // stays reachable when signed out (same as /health).
 app.get('/api/public-config', (c) => c.json({ socialProviders }))
+
+// Read-only access to publicly shared boards and their assets. Registered
+// before requireAuth so anonymous viewers can reach it; each handler gates on
+// boards.isPublic internally.
+app.route('/api/public', publicBoards)
 
 // Everything else under /api requires a signed-in user.
 app.use('/api/*', requireAuth)

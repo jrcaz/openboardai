@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { zipSync, strToU8, type Zippable } from 'fflate'
 import {
@@ -10,6 +10,7 @@ import {
   type BoardSummary,
   type ObxImageMeta,
   type ObxVideoMeta,
+  type ShareState,
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
 import { claimBoard, getClaimableBoard } from '../lib/ownership.js'
@@ -110,12 +111,32 @@ boards.patch('/:id', zValidator('json', UpdateBoardRequest), async (c) => {
     .set({
       ...(patch.title !== undefined ? { title: patch.title } : {}),
       ...(patch.snapshot !== undefined ? { snapshot: patch.snapshot } : {}),
+      ...(patch.isPublic !== undefined ? { isPublic: patch.isPublic } : {}),
+      // Mint a share token the first time the board is made public; keep any
+      // existing token on re-enable (rotation is an explicit regenerate).
+      ...(patch.isPublic === true
+        ? { shareToken: sql`coalesce(${schema.boards.shareToken}, ${nanoid(16)})` }
+        : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(schema.boards.id, id), eq(schema.boards.userId, user.id)))
     .returning()
   if (!row) return c.json({ error: 'not_found' }, 404)
   return c.json(serialize(row))
+})
+
+// Rotate a board's share token, permanently invalidating the previous public
+// link. Leaves isPublic unchanged. Owner-only like the rest of /api/boards.
+boards.post('/:id/share/regenerate', async (c) => {
+  const user = c.get('user')!
+  const id = c.req.param('id')
+  const [row] = await db
+    .update(schema.boards)
+    .set({ shareToken: nanoid(16), updatedAt: new Date() })
+    .where(and(eq(schema.boards.id, id), eq(schema.boards.userId, user.id)))
+    .returning()
+  if (!row) return c.json({ error: 'not_found' }, 404)
+  return c.json({ isPublic: row.isPublic, shareToken: row.shareToken } satisfies ShareState)
 })
 
 // Permanently delete a board. Asset/message tables cascade via their FKs.
@@ -237,6 +258,8 @@ function serialize(row: typeof schema.boards.$inferSelect) {
     id: row.id,
     title: row.title,
     snapshot: row.snapshot,
+    isPublic: row.isPublic,
+    shareToken: row.shareToken,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
