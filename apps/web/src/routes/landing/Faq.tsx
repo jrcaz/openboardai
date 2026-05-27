@@ -12,7 +12,7 @@ const FAQS: QA[] = [
   },
   {
     q: 'Do I need to create an account?',
-    a: "No. There is no signup, no email, no waitlist. Paste your OpenRouter API key into the in-app dialog the first time you create a board and you're in. Your board lives at a shareable URL — bookmark it.",
+    a: "Yes. Sign up with email and password, or continue with GitHub — it takes a few seconds and ties your boards to you so they're not lost if you switch devices or clear your browser. Once you're in, paste your OpenRouter API key the first time you create a board and you're ready.",
   },
   {
     q: 'Where does my OpenRouter API key actually live?',

@@ -51,7 +51,7 @@ export function ByokCallout({ onStart, starting }: Props) {
             <div className="lg:col-span-5">
               <ul className="space-y-3">
                 <Bullet>Key never leaves the browser except as a per-request header.</Bullet>
-                <Bullet>No accounts. No signup. No waitlist.</Bullet>
+                <Bullet>Free account in seconds — email or GitHub. No waitlist.</Bullet>
                 <Bullet>You see exactly what's billed on your OpenRouter dashboard.</Bullet>
                 <Bullet>Open source — fork, self-host, audit the wire.</Bullet>
               </ul>
