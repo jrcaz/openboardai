@@ -74,7 +74,7 @@ export function Hero({ onStart, starting }: Props) {
             </div>
 
             <p className="lp-fade-up-d4 mt-5 text-[12.5px] text-neutral-500">
-              Bring your own OpenRouter key — stored only in this browser. No accounts, no waitlists.
+              Bring your own OpenRouter key — stored only in this browser. Free account, no waitlist.
             </p>
           </div>
 
