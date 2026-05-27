@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db, schema } from '../db/client.js'
+import type { AuthEnv } from '../middleware/auth.js'
 
-export const htmls = new Hono()
+export const htmls = new Hono<AuthEnv>()
 
 // Strict CSP for embedded HTML widgets:
 // - default-src 'self' + data/blob covers most static assets.
@@ -21,11 +22,14 @@ const HTML_CSP =
   "frame-ancestors *;"
 
 htmls.get('/:id', async (c) => {
+  const user = c.get('user')!
   const id = c.req.param('id')
+  // Join through the owning board so users can only read their own widgets.
   const [row] = await db
     .select({ bytes: schema.aiHtmls.bytes })
     .from(schema.aiHtmls)
-    .where(eq(schema.aiHtmls.id, id))
+    .innerJoin(schema.boards, eq(schema.aiHtmls.boardId, schema.boards.id))
+    .where(and(eq(schema.aiHtmls.id, id), eq(schema.boards.userId, user.id)))
     .limit(1)
 
   if (!row) return c.notFound()

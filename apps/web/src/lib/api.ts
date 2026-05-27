@@ -1,4 +1,6 @@
 import type {
+  BoardClaimStatus,
+  BoardListResponse,
   BoardResponse,
   Modality,
   ModelsResponse,
@@ -20,6 +22,14 @@ export type ValidateKeyResponse =
   | { valid: false; reason: 'unauthorized' | 'network' | 'timeout' | 'upstream' | 'bad-request' }
 
 export const api = {
+  // Public, pre-auth config the login screen reads (e.g. enabled social providers).
+  getAuthConfig: () =>
+    fetch('/api/public-config').then((r) =>
+      json<{ socialProviders: { github: boolean } }>(r),
+    ),
+
+  listBoards: () => fetch('/api/boards').then((r) => json<BoardListResponse>(r)),
+
   createBoard: (title?: string) =>
     fetch('/api/boards', {
       method: 'POST',
@@ -28,6 +38,25 @@ export const api = {
     }).then((r) => json<BoardResponse>(r)),
 
   getBoard: (id: string) => fetch(`/api/boards/${id}`).then((r) => json<BoardResponse>(r)),
+
+  // Whether a board that we can't open (404) is an ownerless legacy board the
+  // current user is allowed to claim.
+  getBoardClaimStatus: (id: string) =>
+    fetch(`/api/boards/${id}/claim-status`).then((r) => json<BoardClaimStatus>(r)),
+
+  // Take ownership of an ownerless board; resolves to the now-owned board.
+  claimBoard: (id: string) =>
+    fetch(`/api/boards/${id}/claim`, { method: 'POST' }).then((r) => json<BoardResponse>(r)),
+
+  renameBoard: (id: string, title: string) =>
+    fetch(`/api/boards/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    }).then((r) => json<BoardResponse>(r)),
+
+  deleteBoard: (id: string) =>
+    fetch(`/api/boards/${id}`, { method: 'DELETE' }).then((r) => json<{ ok: true }>(r)),
 
   saveSnapshot: (id: string, snapshot: Record<string, unknown>) =>
     fetch(`/api/boards/${id}`, {
