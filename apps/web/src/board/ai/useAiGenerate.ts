@@ -13,6 +13,9 @@ import {
 import { dataToCells } from '../shapes/spreadsheet/grid'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import {
+  type AnnotationSpec,
+  buildBoardShapeIndex,
+  createAnnotation,
   createConnectingArrow,
   extractHtmlRef,
   extractImageRef,
@@ -117,14 +120,20 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       const ctx: AiContextShape[] = contextShapes.map((s) => {
         const ref = extractImageRef(editor, s)
         const htmlRef = extractHtmlRef(s)
+        const b = editor.getShapePageBounds(s.id)
         return {
           id: s.id as string,
           type: s.type,
           text: extractShapeText(editor, s).slice(0, 4000),
+          ...(b ? { bounds: { x: b.minX, y: b.minY, w: b.width, h: b.height } } : {}),
           ...(ref ? { imageRef: ref } : {}),
           ...(htmlRef ? { htmlRef } : {}),
         }
       })
+
+      // Board-wide index of every shape so the agent can annotate ANY shape,
+      // not just the user's current selection.
+      const boardShapes = buildBoardShapeIndex(editor)
 
       // Track the shape created for each tool call (and its kind) so we can
       // update the right shape when the tool's output arrives.
@@ -145,7 +154,10 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
             boardId,
             messages,
             mode,
-            context: ctx.length > 0 ? { shapes: ctx } : undefined,
+            context:
+              ctx.length > 0 || boardShapes.length > 0
+                ? { shapes: ctx, ...(boardShapes.length > 0 ? { boardShapes } : {}) }
+                : undefined,
             resultShapeId: cardId as string,
             ...(modelPref ? { model: modelPref } : {}),
           } satisfies GenerateRequest),
@@ -272,6 +284,27 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
               },
               { history: 'ignore' },
             )
+            continue
+          }
+
+          if (
+            chunk.type === 'tool-input-available' &&
+            chunk.toolName === 'annotate' &&
+            chunk.toolCallId
+          ) {
+            const input = chunk.input as { annotations?: AnnotationSpec[] }
+            const items = Array.isArray(input.annotations) ? input.annotations : []
+            if (items.length > 0) {
+              editor.run(
+                () => {
+                  for (const item of items) {
+                    if (!item || typeof item.targetId !== 'string') continue
+                    createAnnotation(editor, item)
+                  }
+                },
+                { history: 'ignore' },
+              )
+            }
             continue
           }
 

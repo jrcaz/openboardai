@@ -80,6 +80,11 @@ export const AiContextShape = z.object({
   id: z.string(),
   type: z.string(),
   text: z.string().max(4000),
+  // Page-space bounds {x,y,w,h}. Lets the model reason about layout/position
+  // and target shapes spatially for annotations. Optional for back-compat.
+  bounds: z
+    .object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() })
+    .optional(),
   // Optional pointer to image bytes the server should attach to the model
   // call as a vision input. Either `imageId` (resolved against aiImages.id)
   // or `dataUrl` (data: URL or remote http(s) URL) — never both required.
@@ -101,6 +106,17 @@ export const AiContextShape = z.object({
 })
 export type AiContextShape = z.infer<typeof AiContextShape>
 
+// A lightweight, board-wide index of every shape on the current page so the
+// agent can target ANY shape for annotation (not just the user's selection).
+// Kept minimal to bound token cost.
+export const BoardShapeIndexEntry = z.object({
+  id: z.string(),
+  type: z.string(),
+  bounds: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }),
+  label: z.string().max(120),
+})
+export type BoardShapeIndexEntry = z.infer<typeof BoardShapeIndexEntry>
+
 export const GenerateRequest = z.object({
   boardId: z.string(),
   messages: z.array(ChatMessage).min(1).max(50),
@@ -108,6 +124,8 @@ export const GenerateRequest = z.object({
   context: z
     .object({
       shapes: z.array(AiContextShape).max(20).default([]),
+      // Board-wide shape index for annotation targeting. Capped to bound tokens.
+      boardShapes: z.array(BoardShapeIndexEntry).max(150).optional(),
     })
     .optional(),
   resultShapeId: z.string().optional(),
