@@ -6,7 +6,6 @@ import {
   getSnapshot,
   loadSnapshot,
 } from 'tldraw'
-import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
 import { ClaimBoardScreen } from './ClaimBoardScreen'
 import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
