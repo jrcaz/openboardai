@@ -172,6 +172,14 @@ body,
   will-change: transform, opacity;
 }
 
+/* tldraw mounts its style panel at the top of the right column, where it
+   collides with our custom top-right cluster (avatar + Present + buttons,
+   see BoardEditor.tsx). Push the column down past the cluster:
+   top-4 (16px) + h-9 avatar (36px) + breathing room ≈ 60px. */
+.app-shell .tlui-layout__top__right {
+  padding-top: 60px;
+}
+
 /* Hide tldraw's left-side toolbar / top menu while presenting so the canvas
    reads as a clean surface. The PresentationToggle (top-right) stays. */
 .app-shell.is-presenting .tlui-layout__top,
