@@ -7,6 +7,19 @@ import {
   type TLAssetId,
   type TLRichText,
 } from 'tldraw'
+import type { BoardShapeIndexEntry } from '@openboard-ai/shared'
+
+// tldraw's `toRichText` helper lives in @tldraw/tlschema and is NOT re-exported
+// by the top-level `tldraw` barrel (our only tldraw dependency), so we inline
+// its (trivial) plain-text → TipTap-doc conversion here.
+function plainTextToRichText(text: string): TLRichText {
+  const content = text.split('\n').map((line) =>
+    line
+      ? { type: 'paragraph', content: [{ type: 'text', text: line }] }
+      : { type: 'paragraph' },
+  )
+  return { type: 'doc', content } as TLRichText
+}
 
 export const CARD_GAP = 32
 
@@ -166,4 +179,151 @@ export function extractHtmlRef(shape: TLShape): { htmlId: string } | undefined {
   const props = shape.props as { htmlId?: string | null; status?: string }
   if (!props.htmlId || props.status !== 'done') return undefined
   return { htmlId: props.htmlId }
+}
+
+const BOARD_INDEX_MAX = 150
+const BOARD_LABEL_MAX = 120
+
+/**
+ * Builds a lightweight index of every shape on the current page so the AI can
+ * target ANY shape for annotation (not just the user's selection). Skips the
+ * annotation primitives the agent itself draws (`arrow`, `highlight`) so it
+ * can't annotate its own marks.
+ */
+export function buildBoardShapeIndex(editor: Editor): BoardShapeIndexEntry[] {
+  const out: BoardShapeIndexEntry[] = []
+  for (const id of editor.getCurrentPageShapeIds()) {
+    if (out.length >= BOARD_INDEX_MAX) break
+    const shape = editor.getShape(id)
+    if (!shape) continue
+    if (shape.type === 'arrow' || shape.type === 'highlight') continue
+    const b = editor.getShapePageBounds(id)
+    if (!b) continue
+    const label = extractShapeText(editor, shape)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, BOARD_LABEL_MAX)
+    out.push({
+      id: id as string,
+      type: shape.type,
+      bounds: { x: b.minX, y: b.minY, w: b.width, h: b.height },
+      label,
+    })
+  }
+  return out
+}
+
+export type AnnotationSpec = {
+  kind: 'arrow' | 'box' | 'ellipse' | 'callout' | 'highlight'
+  targetId: string
+  label?: string
+  color?: string
+}
+
+const ANNOTATION_PAD = 16
+const CALLOUT_W = 200
+const ARROW_OFFSET = 80
+
+/**
+ * Draws one annotation anchored to an EXISTING target shape using native tldraw
+ * shapes. Returns the ids of shapes it created, or [] if the target id can't be
+ * resolved (deleted / on another page). Must be called inside `editor.run(...)`.
+ */
+export function createAnnotation(editor: Editor, spec: AnnotationSpec): TLShapeId[] {
+  const targetId = spec.targetId as TLShapeId
+  const b = editor.getShapePageBounds(targetId)
+  if (!b) return []
+  const color = spec.color ?? 'red'
+
+  if (spec.kind === 'box' || spec.kind === 'ellipse') {
+    const id = createShapeId()
+    editor.createShape({
+      id,
+      type: 'geo',
+      x: b.minX - ANNOTATION_PAD,
+      y: b.minY - ANNOTATION_PAD,
+      props: {
+        geo: spec.kind === 'box' ? 'rectangle' : 'ellipse',
+        w: b.width + ANNOTATION_PAD * 2,
+        h: b.height + ANNOTATION_PAD * 2,
+        color,
+        fill: 'none',
+        dash: 'solid',
+        size: 'm',
+      } as never,
+    })
+    return [id]
+  }
+
+  if (spec.kind === 'callout') {
+    const id = createShapeId()
+    editor.createShape({
+      id,
+      type: 'text',
+      x: b.maxX + ANNOTATION_PAD,
+      y: b.minY,
+      props: {
+        richText: plainTextToRichText(spec.label ?? ''),
+        color,
+        w: CALLOUT_W,
+        autoSize: false,
+      } as never,
+    })
+    return [id]
+  }
+
+  if (spec.kind === 'highlight') {
+    const id = createShapeId()
+    editor.createShape({
+      id,
+      type: 'highlight',
+      x: b.minX,
+      y: b.midY,
+      props: {
+        // The highlight palette is limited; force a safe, visible value.
+        color: 'yellow',
+        size: 'xl',
+        isComplete: true,
+        segments: [
+          {
+            type: 'straight',
+            points: [
+              { x: 0, y: 0, z: 0.5 },
+              { x: b.width, y: 0, z: 0.5 },
+            ],
+          },
+        ],
+      } as never,
+    })
+    return [id]
+  }
+
+  // arrow: END binds to the target; START is a free point up-and-left of it.
+  const arrowId = createShapeId()
+  editor.createShape({
+    id: arrowId,
+    type: 'arrow',
+    x: 0,
+    y: 0,
+    props: {
+      start: { x: b.minX - ARROW_OFFSET, y: b.minY - ARROW_OFFSET },
+      end: { x: b.minX, y: b.minY },
+      ...(spec.label ? { richText: plainTextToRichText(spec.label) } : {}),
+      color,
+    } as never,
+  })
+  editor.createBindings([
+    {
+      type: 'arrow',
+      fromId: arrowId,
+      toId: targetId,
+      props: {
+        terminal: 'end',
+        isPrecise: false,
+        isExact: false,
+        normalizedAnchor: { x: 0.5, y: 0.5 },
+      },
+    } as never,
+  ])
+  return [arrowId]
 }
