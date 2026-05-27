@@ -24,6 +24,7 @@ import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
 import { FileMenu } from './FileMenu'
+import { BoardLoading } from './BoardLoading'
 
 const customShapeUtils = [
   AiCardShapeUtil,
@@ -213,11 +214,7 @@ export function BoardEditor({ boardId }: Props) {
   }
 
   if (!loadedRef.current) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-neutral-500">
-        Loading board…
-      </div>
-    )
+    return <BoardLoading />
   }
 
   return (
