@@ -6,6 +6,8 @@ import { logger } from 'hono/logger'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { auth, socialProviders } from './auth.js'
+import { requireAuth, sessionMiddleware, type AuthEnv } from './middleware/auth.js'
 import { ai } from './routes/ai.js'
 import { boards } from './routes/boards.js'
 import { htmls } from './routes/htmls.js'
@@ -14,19 +16,42 @@ import { models } from './routes/models.js'
 import { settings } from './routes/settings.js'
 import { videos } from './routes/videos.js'
 
-const app = new Hono()
+const app = new Hono<AuthEnv>()
+
+// Origins allowed to make credentialed (cookie-bearing) requests. Same-origin
+// in practice (dev proxy / prod static serving); pinned here to block other sites.
+const corsOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3001',
+  ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ??
+    []),
+]
 
 app.use('*', logger())
 app.use(
   '/api/*',
   cors({
-    origin: '*',
-    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    origin: corsOrigins,
+    credentials: true,
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'X-OpenRouter-Key'],
   }),
 )
 
 app.get('/health', (c) => c.json({ ok: true }))
+
+// Populate user/session for every API request, then mount Better Auth's own
+// handler (sign-up / sign-in / sign-out / session). Auth routes stay public.
+app.use('/api/*', sessionMiddleware)
+app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
+
+// Public, unauthenticated config the login screen needs before a user exists —
+// e.g. which social providers are enabled. Registered before requireAuth so it
+// stays reachable when signed out (same as /health).
+app.get('/api/public-config', (c) => c.json({ socialProviders }))
+
+// Everything else under /api requires a signed-in user.
+app.use('/api/*', requireAuth)
 
 app.route('/api/boards', boards)
 app.route('/api/ai', ai)

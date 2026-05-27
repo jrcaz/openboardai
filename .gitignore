@@ -10,3 +10,8 @@ build
 coverage
 CODEBASE.html
 *.tsbuildinfo
+
+# This is a pnpm repo; reject stray lockfiles from other package managers.
+bun.lock
+package-lock.json
+yarn.lock

@@ -8,6 +8,7 @@ import {
 } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
+import { ClaimBoardScreen } from './ClaimBoardScreen'
 import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
 import { AiHtmlShapeUtil } from './shapes/AiHtmlShapeUtil'
 import { AiImageShapeUtil } from './shapes/AiImageShapeUtil'
@@ -18,6 +19,7 @@ import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
 import { SettingsButton } from '../settings/SettingsButton'
+import { UserMenu } from '../components/UserMenu'
 import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
@@ -40,6 +42,10 @@ export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Set when the board 404s but is an ownerless legacy board the user can claim.
+  const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
+  // Bumped after a successful claim to re-run the load effect (board is now ours).
+  const [reloadNonce, setReloadNonce] = useState(0)
   const initialSnapshotRef = useRef<TLStoreSnapshot | null>(null)
   const loadedRef = useRef(false)
   const saveTimerRef = useRef<number | null>(null)
@@ -49,6 +55,8 @@ export function BoardEditor({ boardId }: Props) {
   // avoids a flicker where empty store is rendered then replaced.
   useEffect(() => {
     let cancelled = false
+    setLoadError(null)
+    setClaimable(null)
     api
       .getBoard(boardId)
       .then((board) => {
@@ -61,11 +69,29 @@ export function BoardEditor({ boardId }: Props) {
         setEditor((e) => e)
         forceMount()
       })
-      .catch((err) => setLoadError((err as Error).message))
+      .catch(async (err) => {
+        if (cancelled) return
+        const message = (err as Error).message
+        // A 404 might be an ownerless legacy board the user can claim rather
+        // than a genuinely missing/forbidden one — probe before erroring out.
+        if (/\b404\b/.test(message)) {
+          try {
+            const status = await api.getBoardClaimStatus(boardId)
+            if (cancelled) return
+            if (status.claimable) {
+              setClaimable({ title: status.title })
+              return
+            }
+          } catch {
+            // fall through to the generic error below
+          }
+        }
+        if (!cancelled) setLoadError(message)
+      })
     return () => {
       cancelled = true
     }
-  }, [boardId])
+  }, [boardId, reloadNonce])
 
   const [, forceTick] = useState(0)
   const forceMount = useCallback(() => forceTick((t) => t + 1), [])
@@ -151,10 +177,37 @@ export function BoardEditor({ boardId }: Props) {
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
 
-  if (loadError) {
+  if (claimable) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-red-600">
-        Failed to load board: {loadError}
+      <ClaimBoardScreen
+        boardId={boardId}
+        title={claimable.title}
+        onClaimed={() => {
+          setClaimable(null)
+          setReloadNonce((n) => n + 1)
+        }}
+      />
+    )
+  }
+
+  if (loadError) {
+    const notFound = /\b404\b/.test(loadError)
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="text-[15px] font-semibold text-neutral-800">
+          {notFound ? "This board isn't available" : 'Failed to load board'}
+        </div>
+        <div className="max-w-md text-[13px] text-neutral-500">
+          {notFound
+            ? "It may have been deleted, or it belongs to another account."
+            : loadError}
+        </div>
+        <a
+          href="/dashboard"
+          className="mt-1 inline-flex items-center rounded-lg bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-[13px] font-semibold text-neutral-900 shadow-sm transition hover:from-amber-500 hover:to-orange-500"
+        >
+          Back to your boards
+        </a>
       </div>
     )
   }
@@ -184,6 +237,9 @@ export function BoardEditor({ boardId }: Props) {
         <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
         <SettingsButton />
+        <div className="pointer-events-auto">
+          <UserMenu />
+        </div>
         <PresentationToggle
           editor={editor}
           isPresenting={isPresenting}

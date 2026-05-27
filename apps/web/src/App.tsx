@@ -1,6 +1,10 @@
 import { Route, Switch } from 'wouter'
 import { Landing } from './routes/Landing'
 import { BoardPage } from './routes/Board'
+import { Dashboard } from './routes/Dashboard'
+import { Login } from './routes/Login'
+import { Signup } from './routes/Signup'
+import { AuthGate } from './components/AuthGate'
 import { ApiKeyProvider } from './settings/useApiKey'
 import { ApiKeyGate } from './settings/ApiKeyGate'
 import { ModelPreferencesProvider } from './settings/useModelPreferences'
@@ -11,10 +15,19 @@ export function App() {
       <ModelPreferencesProvider>
         <Switch>
           <Route path="/" component={Landing} />
+          <Route path="/login" component={Login} />
+          <Route path="/signup" component={Signup} />
+          <Route path="/dashboard">
+            <AuthGate>
+              <Dashboard />
+            </AuthGate>
+          </Route>
           <Route path="/b/:boardId">
-            <ApiKeyGate>
-              <BoardPage />
-            </ApiKeyGate>
+            <AuthGate>
+              <ApiKeyGate>
+                <BoardPage />
+              </ApiKeyGate>
+            </AuthGate>
           </Route>
           <Route>
             <div className="p-6 text-sm text-neutral-600">Not found.</div>
