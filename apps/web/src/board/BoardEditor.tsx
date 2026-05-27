@@ -6,13 +6,9 @@ import {
   getSnapshot,
   loadSnapshot,
 } from 'tldraw'
-import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
 import { ClaimBoardScreen } from './ClaimBoardScreen'
-import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
-import { AiHtmlShapeUtil } from './shapes/AiHtmlShapeUtil'
-import { AiImageShapeUtil } from './shapes/AiImageShapeUtil'
-import { AiVideoShapeUtil } from './shapes/AiVideoShapeUtil'
+import { customShapeUtils } from './shapes/customShapeUtils'
 import { AiPromptBar } from './ai/AiPromptBar'
 import { importHtmlFile, isHtmlFile } from './ai/useAiHtmlImport'
 import { PresentationToggle } from './present/PresentationToggle'
@@ -25,15 +21,23 @@ import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
 import { FileMenu } from './FileMenu'
 import { BoardLoading } from './BoardLoading'
-
-const customShapeUtils = [
-  AiCardShapeUtil,
-  AiImageShapeUtil,
-  AiVideoShapeUtil,
-  AiHtmlShapeUtil,
-]
+import { ShareButton } from './ShareButton'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
+
+// Maps an HTTP status (parsed out of `lib/api.ts`'s "HTTP <code>: <body>"
+// error string) to a short message we can render in the share popover.
+function friendlyShareError(err: unknown, fallback: string): string {
+  const message = err instanceof Error ? err.message : String(err)
+  const match = /^HTTP (\d+):/.exec(message)
+  if (!match) return fallback
+  const status = Number(match[1])
+  if (status === 401) return 'Your session has expired. Please sign in again.'
+  if (status === 403) return "You don't have permission to share this board."
+  if (status === 404) return "This board no longer exists, or isn't yours."
+  if (status >= 500) return 'The server had a problem updating sharing. Please try again.'
+  return fallback
+}
 
 interface Props {
   boardId: string
@@ -45,6 +49,15 @@ export function BoardEditor({ boardId }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null)
   // Set when the board 404s but is an ownerless legacy board the user can claim.
   const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
+  // Public sharing state owned at this level so the ShareButton is purely
+  // presentational and any update from toggle/regenerate is reflected in a
+  // single source of truth (rather than divergent state inside the button).
+  const [share, setShare] = useState<{ isPublic: boolean; shareToken: string | null }>({
+    isPublic: false,
+    shareToken: null,
+  })
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
   // Bumped after a successful claim to re-run the load effect (board is now ours).
   const [reloadNonce, setReloadNonce] = useState(0)
   const initialSnapshotRef = useRef<TLStoreSnapshot | null>(null)
@@ -65,6 +78,7 @@ export function BoardEditor({ boardId }: Props) {
         if (board.snapshot && Object.keys(board.snapshot).length > 0) {
           initialSnapshotRef.current = board.snapshot as unknown as TLStoreSnapshot
         }
+        setShare({ isPublic: board.isPublic, shareToken: board.shareToken })
         loadedRef.current = true
         // Force a render to mount <Tldraw> with the snapshot prop.
         setEditor((e) => e)
@@ -174,6 +188,54 @@ export function BoardEditor({ boardId }: Props) {
     [boardId],
   )
 
+  // Mirrors the current `boardId` prop so async share handlers below can detect
+  // when the user has navigated to a different board mid-flight and skip
+  // writing the stale response into the new board's share state.
+  const currentBoardIdRef = useRef(boardId)
+  useEffect(() => {
+    currentBoardIdRef.current = boardId
+  }, [boardId])
+
+  // Toggle public sharing on/off. Owned here (not in ShareButton) so the
+  // server's authoritative response always lands in the same `share` state the
+  // rest of the editor reads — no chance of a stale child copy diverging.
+  const handleShareToggle = useCallback(
+    async (next: boolean) => {
+      const requestedFor = boardId
+      setShareBusy(true)
+      setShareError(null)
+      try {
+        const board = await api.setBoardPublic(requestedFor, next)
+        if (currentBoardIdRef.current !== requestedFor) return
+        setShare({ isPublic: board.isPublic, shareToken: board.shareToken })
+      } catch (err) {
+        if (currentBoardIdRef.current !== requestedFor) return
+        console.error('[share] toggle failed', err)
+        setShareError(friendlyShareError(err, 'Could not update sharing.'))
+      } finally {
+        if (currentBoardIdRef.current === requestedFor) setShareBusy(false)
+      }
+    },
+    [boardId],
+  )
+
+  const handleShareRegenerate = useCallback(async () => {
+    const requestedFor = boardId
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      const next = await api.regenerateShareToken(requestedFor)
+      if (currentBoardIdRef.current !== requestedFor) return
+      setShare({ isPublic: next.isPublic, shareToken: next.shareToken })
+    } catch (err) {
+      if (currentBoardIdRef.current !== requestedFor) return
+      console.error('[share] regenerate failed', err)
+      setShareError(friendlyShareError(err, 'Could not generate a new link.'))
+    } finally {
+      if (currentBoardIdRef.current === requestedFor) setShareBusy(false)
+    }
+  }, [boardId])
+
   usePresentationShortcuts({ editor, isPresenting, setIsPresenting })
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
@@ -231,6 +293,15 @@ export function BoardEditor({ boardId }: Props) {
       />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
+        <ShareButton
+          isPublic={share.isPublic}
+          shareToken={share.shareToken}
+          busy={shareBusy}
+          error={shareError}
+          onToggle={handleShareToggle}
+          onRegenerate={handleShareRegenerate}
+          onDismissError={() => setShareError(null)}
+        />
         <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
         <SettingsButton />

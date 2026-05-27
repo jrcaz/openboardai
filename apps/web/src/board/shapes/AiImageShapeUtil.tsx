@@ -11,6 +11,8 @@ import {
 } from 'tldraw'
 import { TitleField } from './TitleField'
 import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
+import { useAssetBase } from '../assetBase'
+import { useIsReadonly } from './useIsReadonly'
 
 export const AI_IMAGE_TYPE = 'ai-image' as const
 
@@ -75,6 +77,8 @@ export class AiImageShapeUtil extends BaseBoxShapeUtil<AiImageShape> {
 
 function AiImageComponent({ shape }: { shape: AiImageShape }) {
   const editor = useEditor()
+  const assetBase = useAssetBase()
+  const readonly = useIsReadonly()
   const { w, h, prompt, status, imageId, errorMessage, title } = shape.props
   const [imgLoaded, setImgLoaded] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -94,7 +98,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
       : 'border-neutral-200'
 
   const showTitleBar = !!title || isSelected || editingTitle
-  const showPencil = status === 'done' && imgLoaded && isHovered && !isEditing
+  const showPencil = status === 'done' && imgLoaded && isHovered && !isEditing && !readonly
 
   return (
     <HTMLContainer
@@ -109,7 +113,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
         {/* The image — fades in once loaded. Always mounted in done/error so swap is seamless. */}
         {status !== 'generating' && imageId && (
           <img
-            src={`/api/images/${imageId}`}
+            src={`${assetBase}/images/${imageId}`}
             alt={prompt}
             draggable={false}
             onLoad={() => setImgLoaded(true)}
@@ -121,7 +125,12 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
         {status === 'generating' && <GeneratingLayer prompt={prompt} />}
 
         {status === 'error' && (
-          <ErrorLayer prompt={prompt} message={errorMessage} shapeId={shape.id} />
+          <ErrorLayer
+            prompt={prompt}
+            message={errorMessage}
+            shapeId={shape.id}
+            readonly={readonly}
+          />
         )}
 
         {/* Optional user-set title — shows always when set, or as a faint
@@ -141,6 +150,7 @@ function AiImageComponent({ shape }: { shape: AiImageShape }) {
               displayClassName={`block w-full truncate text-[12px] font-semibold leading-snug text-white drop-shadow cursor-text ${title ? '' : 'opacity-80'}`}
               inputClassName="block w-full truncate rounded bg-white/95 px-1.5 py-0.5 text-[12px] font-semibold text-neutral-800 outline-none ring-1 ring-orange-300 focus:ring-orange-500"
               onEditingChange={setEditingTitle}
+              readonly={readonly}
             />
           </div>
         )}
@@ -232,10 +242,12 @@ function ErrorLayer({
   prompt,
   message,
   shapeId,
+  readonly,
 }: {
   prompt: string
   message: string | null
   shapeId: string
+  readonly: boolean
 }) {
   return (
     <div
@@ -263,18 +275,20 @@ function ErrorLayer({
           </p>
         )}
       </div>
-      <button
-        onPointerDown={stopEventPropagation}
-        onClick={(e) => {
-          e.stopPropagation()
-          window.dispatchEvent(
-            new CustomEvent('ai-image:retry', { detail: { shapeId, prompt } }),
-          )
-        }}
-        className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-red-700 shadow-sm ring-1 ring-red-200 transition hover:bg-red-50"
-      >
-        Retry
-      </button>
+      {!readonly && (
+        <button
+          onPointerDown={stopEventPropagation}
+          onClick={(e) => {
+            e.stopPropagation()
+            window.dispatchEvent(
+              new CustomEvent('ai-image:retry', { detail: { shapeId, prompt } }),
+            )
+          }}
+          className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-red-700 shadow-sm ring-1 ring-red-200 transition hover:bg-red-50"
+        >
+          Retry
+        </button>
+      )}
     </div>
   )
 }

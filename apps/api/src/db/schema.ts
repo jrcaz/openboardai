@@ -72,6 +72,12 @@ export const boards = pgTable('boards', {
   // pre-existing ownerless rows; new boards always set this to the creator.
   userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
   snapshot: jsonb('snapshot').$type<Record<string, unknown>>(),
+  // Public read-only sharing. `isPublic` gates anonymous access; `shareToken` is
+  // the unguessable, owner-revocable id used in the public URL (/p/:token).
+  // Minted the first time a board is shared and rotated on regenerate, which
+  // permanently invalidates the previous link.
+  isPublic: boolean('is_public').notNull().default(false),
+  shareToken: text('share_token').unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

@@ -40,9 +40,32 @@ export function AiPromptBar({ boardId, editor }: Props) {
   const [aspect, setAspect] = useState<ImageAspect>('1:1')
   const [videoAspect, setVideoAspect] = useState<VideoAspect>('16:9')
   const [generateAudio, setGenerateAudio] = useState(true)
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('ai-prompt-bar:collapsed') === '1'
+  })
   const { enabled: autoConnect, toggle: toggleAutoConnect } = useAutoConnectArrows()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const didMountRef = useRef(false)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    try {
+      window.localStorage.setItem('ai-prompt-bar:collapsed', collapsed ? '1' : '0')
+    } catch {
+      // Ignore quota / privacy-mode errors.
+    }
+  }, [collapsed])
+
+  const isMac = useMemo(() => {
+    if (typeof navigator === 'undefined') return true
+    return /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+  }, [])
+  const modKey = isMac ? '⌘' : 'Ctrl'
 
   useLayoutEffect(() => {
     const el = inputRef.current
@@ -60,9 +83,20 @@ export function AiPromptBar({ boardId, editor }: Props) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        inputRef.current?.focus()
+        setCollapsed(false)
+        requestAnimationFrame(() =>
+          inputRef.current?.focus({ preventScroll: true })
+        )
+      } else if (mod && e.key === '\\') {
+        // ⌘. is reserved by tldraw (Toggle Focus Mode), so use ⌘\ for show/hide.
+        e.preventDefault()
+        setCollapsed((c) => {
+          if (!c) inputRef.current?.blur()
+          return !c
+        })
       }
     }
     window.addEventListener('keydown', onKey)
@@ -284,7 +318,26 @@ export function AiPromptBar({ boardId, editor }: Props) {
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-50 flex justify-center pb-20">
-      <div className="pointer-events-auto flex w-[min(720px,90vw)] flex-col gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.18)] backdrop-blur">
+      <CollapsedPill
+        visible={collapsed}
+        mode={mode}
+        modKey={modKey}
+        onExpand={() => {
+          setCollapsed(false)
+          requestAnimationFrame(() =>
+            inputRef.current?.focus({ preventScroll: true })
+          )
+        }}
+      />
+      <div
+        aria-hidden={collapsed}
+        inert={collapsed}
+        className={`pointer-events-auto flex w-[min(720px,90vw)] flex-col gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.18)] backdrop-blur transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          collapsed
+            ? 'pointer-events-none translate-y-3 scale-[0.96] opacity-0'
+            : 'translate-y-0 scale-100 opacity-100'
+        }`}
+      >
         {/* Top strip: Mode toggle + (selection or aspect chips) + model picker */}
         <div className="flex items-center justify-between gap-2 px-1 pt-0.5">
           <ModeToggle mode={mode} onChange={setMode} />
@@ -311,6 +364,13 @@ export function AiPromptBar({ boardId, editor }: Props) {
               onPick={() => fileInputRef.current?.click()}
             />
             <ModelPicker modality={mode} />
+            <CollapseButton
+              modKey={modKey}
+              onClick={() => {
+                inputRef.current?.blur()
+                setCollapsed(true)
+              }}
+            />
           </div>
         </div>
         <input
@@ -633,6 +693,93 @@ function ImportHtmlButton({
       </svg>
       Import HTML
     </button>
+  )
+}
+
+function CollapseButton({
+  onClick,
+  modKey,
+}: {
+  onClick: () => void
+  modKey: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Hide input bar (${modKey}\\)`}
+      aria-label="Hide AI input bar"
+      className="group inline-flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 active:scale-90"
+    >
+      <svg
+        className="h-3 w-3 transition-transform group-hover:translate-y-0.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+  )
+}
+
+function CollapsedPill({
+  visible,
+  mode,
+  modKey,
+  onExpand,
+}: {
+  visible: boolean
+  mode: Mode
+  modKey: string
+  onExpand: () => void
+}) {
+  const accent =
+    mode === 'image'
+      ? 'text-orange-600'
+      : mode === 'video'
+      ? 'text-amber-800'
+      : 'text-amber-600'
+  return (
+    <div
+      aria-hidden={!visible}
+      inert={!visible}
+      className={`pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-20 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        visible
+          ? 'translate-y-0 opacity-100'
+          : 'translate-y-2 opacity-0'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onExpand}
+        tabIndex={visible ? 0 : -1}
+        title={`Show input bar (${modKey}K)`}
+        aria-label="Show AI input bar"
+        className={`pointer-events-auto group inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/95 py-2 pl-3 pr-4 text-[12px] font-medium text-neutral-700 shadow-[0_4px_20px_-6px_rgba(0,0,0,0.18)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.22)] active:scale-[0.98] ${
+          visible ? 'scale-100' : 'scale-90'
+        }`}
+      >
+        <span className={`flex h-5 w-5 items-center justify-center ${accent}`}>
+          <svg
+            className="h-3.5 w-3.5 transition-transform duration-500 group-hover:rotate-12"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6L12 2z" />
+            <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z" opacity=".7" />
+          </svg>
+        </span>
+        <span>Ask AI</span>
+        <kbd className="ml-1 hidden rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 sm:inline-block">
+          {modKey}K
+        </kbd>
+      </button>
+    </div>
   )
 }
 

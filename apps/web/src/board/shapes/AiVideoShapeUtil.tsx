@@ -11,6 +11,8 @@ import {
 } from 'tldraw'
 import { TitleField } from './TitleField'
 import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
+import { useAssetBase } from '../assetBase'
+import { useIsReadonly } from './useIsReadonly'
 
 export const AI_VIDEO_TYPE = 'ai-video' as const
 
@@ -86,6 +88,8 @@ export class AiVideoShapeUtil extends BaseBoxShapeUtil<AiVideoShape> {
 
 function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
   const editor = useEditor()
+  const assetBase = useAssetBase()
+  const readonly = useIsReadonly()
   const { w, h, prompt, status, videoId, hasAudio, errorMessage, startedAt, title } =
     shape.props
   const [videoLoaded, setVideoLoaded] = useState(false)
@@ -108,7 +112,7 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
       ? 'border-red-300'
       : 'border-neutral-200'
 
-  const showPencil = status === 'done' && videoLoaded && isHovered && !isEditing
+  const showPencil = status === 'done' && videoLoaded && isHovered && !isEditing && !readonly
 
   return (
     <HTMLContainer
@@ -123,7 +127,7 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
         {status !== 'generating' && videoId && (
           <video
             ref={videoRef}
-            src={`/api/videos/${videoId}`}
+            src={`${assetBase}/videos/${videoId}`}
             autoPlay
             loop
             muted={muted}
@@ -141,7 +145,12 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
         )}
 
         {status === 'error' && (
-          <ErrorLayer prompt={prompt} message={errorMessage} shapeId={shape.id} />
+          <ErrorLayer
+            prompt={prompt}
+            message={errorMessage}
+            shapeId={shape.id}
+            readonly={readonly}
+          />
         )}
 
         {/* Mute / unmute pill — only for done state with audio. */}
@@ -177,6 +186,7 @@ function AiVideoComponent({ shape }: { shape: AiVideoShape }) {
               displayClassName={`block w-full truncate text-[12px] font-semibold leading-snug text-white drop-shadow cursor-text ${title ? '' : 'opacity-80'}`}
               inputClassName="block w-full truncate rounded bg-white/95 px-1.5 py-0.5 text-[12px] font-semibold text-neutral-800 outline-none ring-1 ring-amber-300 focus:ring-amber-500"
               onEditingChange={setEditingTitle}
+              readonly={readonly}
             />
           </div>
         )}
@@ -287,10 +297,12 @@ function ErrorLayer({
   prompt,
   message,
   shapeId,
+  readonly,
 }: {
   prompt: string
   message: string | null
   shapeId: string
+  readonly: boolean
 }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-red-50 to-rose-50 px-4 text-center">
@@ -316,18 +328,20 @@ function ErrorLayer({
           </p>
         )}
       </div>
-      <button
-        onPointerDown={stopEventPropagation}
-        onClick={(e) => {
-          e.stopPropagation()
-          window.dispatchEvent(
-            new CustomEvent('ai-video:retry', { detail: { shapeId, prompt } }),
-          )
-        }}
-        className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-red-700 shadow-sm ring-1 ring-red-200 transition hover:bg-red-50"
-      >
-        Retry
-      </button>
+      {!readonly && (
+        <button
+          onPointerDown={stopEventPropagation}
+          onClick={(e) => {
+            e.stopPropagation()
+            window.dispatchEvent(
+              new CustomEvent('ai-video:retry', { detail: { shapeId, prompt } }),
+            )
+          }}
+          className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-red-700 shadow-sm ring-1 ring-red-200 transition hover:bg-red-50"
+        >
+          Retry
+        </button>
+      )}
     </div>
   )
 }
