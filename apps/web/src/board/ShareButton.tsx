@@ -1,48 +1,37 @@
 import { useState } from 'react'
-import { api } from '../lib/api'
 
 interface Props {
-  boardId: string
-  initialIsPublic: boolean
-  initialShareToken: string | null
+  isPublic: boolean
+  shareToken: string | null
+  busy: boolean
+  error: string | null
+  onToggle: (next: boolean) => void
+  onRegenerate: () => void
+  onDismissError: () => void
 }
 
 // Owner control for public read-only sharing. Toggling on mints a share link;
-// "New link" rotates the token and breaks the old URL. Lives in the editor's
-// top-right cluster next to the other circular badges.
-export function ShareButton({ boardId, initialIsPublic, initialShareToken }: Props) {
+// "New link" rotates the token and breaks the old URL. State (isPublic /
+// shareToken / busy / error) lives in BoardEditor so it stays the single source
+// of truth — this component is presentational with only ephemeral popover UI
+// state (whether the panel is open, whether copy feedback is showing).
+export function ShareButton({
+  isPublic,
+  shareToken,
+  busy,
+  error,
+  onToggle,
+  onRegenerate,
+  onDismissError,
+}: Props) {
   const [open, setOpen] = useState(false)
-  const [isPublic, setIsPublic] = useState(initialIsPublic)
-  const [shareToken, setShareToken] = useState(initialShareToken)
-  const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const shareUrl = shareToken ? `${window.location.origin}/p/${shareToken}` : null
 
-  async function toggle(next: boolean) {
-    setBusy(true)
-    try {
-      const board = await api.setBoardPublic(boardId, next)
-      setIsPublic(board.isPublic)
-      setShareToken(board.shareToken)
-    } catch (err) {
-      console.error('[share] toggle failed', err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function regenerate() {
+  function handleRegenerate() {
     if (!window.confirm('Generate a new link? The current link will stop working.')) return
-    setBusy(true)
-    try {
-      const next = await api.regenerateShareToken(boardId)
-      setShareToken(next.shareToken)
-    } catch (err) {
-      console.error('[share] regenerate failed', err)
-    } finally {
-      setBusy(false)
-    }
+    onRegenerate()
   }
 
   function copy() {
@@ -54,6 +43,11 @@ export function ShareButton({ boardId, initialIsPublic, initialShareToken }: Pro
       },
       () => {},
     )
+  }
+
+  function closePopover() {
+    setOpen(false)
+    onDismissError()
   }
 
   return (
@@ -79,7 +73,7 @@ export function ShareButton({ boardId, initialIsPublic, initialShareToken }: Pro
 
       {open && (
         <>
-          <div className="fixed inset-0 z-[590]" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[590]" onClick={closePopover} />
           <div className="absolute right-0 top-full z-[600] mt-2 w-80 rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-2xl ring-1 ring-black/5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -93,7 +87,7 @@ export function ShareButton({ boardId, initialIsPublic, initialShareToken }: Pro
                 role="switch"
                 aria-checked={isPublic}
                 disabled={busy}
-                onClick={() => toggle(!isPublic)}
+                onClick={() => onToggle(!isPublic)}
                 className={`relative mt-0.5 h-6 w-11 flex-none rounded-full transition disabled:opacity-50 ${
                   isPublic ? 'bg-amber-500' : 'bg-neutral-300'
                 }`}
@@ -105,6 +99,12 @@ export function ShareButton({ boardId, initialIsPublic, initialShareToken }: Pro
                 />
               </button>
             </div>
+
+            {error && (
+              <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] leading-snug text-red-700">
+                {error}
+              </div>
+            )}
 
             {isPublic && shareUrl && (
               <div className="mt-4 space-y-2">
@@ -125,7 +125,7 @@ export function ShareButton({ boardId, initialIsPublic, initialShareToken }: Pro
                 </div>
                 <button
                   type="button"
-                  onClick={regenerate}
+                  onClick={handleRegenerate}
                   disabled={busy}
                   className="text-[12px] font-medium text-neutral-500 transition hover:text-neutral-800 disabled:opacity-50"
                 >
