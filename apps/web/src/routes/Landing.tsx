@@ -4,7 +4,9 @@ import { useSession } from '../lib/auth-client'
 import { LandingNav } from './landing/Nav'
 import { Hero } from './landing/Hero'
 import { Features } from './landing/Features'
+import { HtmlWidgets } from './landing/HtmlWidgets'
 import { HowItWorks } from './landing/HowItWorks'
+import { Faq } from './landing/Faq'
 import { ByokCallout } from './landing/ByokCallout'
 import { LandingFooter } from './landing/Footer'
 
@@ -23,7 +25,9 @@ export function Landing() {
       <main>
         <Hero onStart={handleStart} starting={false} />
         <Features />
+        <HtmlWidgets />
         <HowItWorks />
+        <Faq />
         <ByokCallout onStart={handleStart} starting={false} />
       </main>
       <LandingFooter />
