@@ -9,10 +9,7 @@ import {
 import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
 import { ClaimBoardScreen } from './ClaimBoardScreen'
-import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
-import { AiHtmlShapeUtil } from './shapes/AiHtmlShapeUtil'
-import { AiImageShapeUtil } from './shapes/AiImageShapeUtil'
-import { AiVideoShapeUtil } from './shapes/AiVideoShapeUtil'
+import { customShapeUtils } from './shapes/customShapeUtils'
 import { AiPromptBar } from './ai/AiPromptBar'
 import { importHtmlFile, isHtmlFile } from './ai/useAiHtmlImport'
 import { PresentationToggle } from './present/PresentationToggle'
@@ -24,13 +21,7 @@ import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
 import { useToolsVisible } from './useToolsVisible'
 import { FileMenu } from './FileMenu'
-
-const customShapeUtils = [
-  AiCardShapeUtil,
-  AiImageShapeUtil,
-  AiVideoShapeUtil,
-  AiHtmlShapeUtil,
-]
+import { ShareButton } from './ShareButton'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
@@ -44,6 +35,12 @@ export function BoardEditor({ boardId }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null)
   // Set when the board 404s but is an ownerless legacy board the user can claim.
   const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
+  // Public sharing state, captured from the initial board load and handed to
+  // the ShareButton so it doesn't need a second (snapshot-heavy) fetch.
+  const [share, setShare] = useState<{ isPublic: boolean; shareToken: string | null }>({
+    isPublic: false,
+    shareToken: null,
+  })
   // Bumped after a successful claim to re-run the load effect (board is now ours).
   const [reloadNonce, setReloadNonce] = useState(0)
   const initialSnapshotRef = useRef<TLStoreSnapshot | null>(null)
@@ -64,6 +61,7 @@ export function BoardEditor({ boardId }: Props) {
         if (board.snapshot && Object.keys(board.snapshot).length > 0) {
           initialSnapshotRef.current = board.snapshot as unknown as TLStoreSnapshot
         }
+        setShare({ isPublic: board.isPublic, shareToken: board.shareToken })
         loadedRef.current = true
         // Force a render to mount <Tldraw> with the snapshot prop.
         setEditor((e) => e)
@@ -234,6 +232,11 @@ export function BoardEditor({ boardId }: Props) {
       />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
+        <ShareButton
+          boardId={boardId}
+          initialIsPublic={share.isPublic}
+          initialShareToken={share.shareToken}
+        />
         <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
         <SettingsButton />
