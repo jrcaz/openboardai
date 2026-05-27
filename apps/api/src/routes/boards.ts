@@ -1,18 +1,21 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { zipSync, strToU8, type Zippable } from 'fflate'
 import {
   CreateBoardRequest,
   UpdateBoardRequest,
   OBX_VERSION,
+  type BoardSummary,
   type ObxImageMeta,
   type ObxVideoMeta,
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
+import { claimBoard, getClaimableBoard } from '../lib/ownership.js'
+import type { AuthEnv } from '../middleware/auth.js'
 
-export const boards = new Hono()
+export const boards = new Hono<AuthEnv>()
 
 function extFromMediaType(mediaType: string): string {
   const m = mediaType.toLowerCase()
@@ -32,24 +35,74 @@ function safeFilename(title: string): string {
   return (cleaned || 'board') + '.obx'
 }
 
+// List the signed-in user's boards (most-recently edited first). Returns
+// lightweight summaries without the tldraw snapshot to keep the dashboard fast.
+boards.get('/', async (c) => {
+  const user = c.get('user')!
+  const rows = await db
+    .select({
+      id: schema.boards.id,
+      title: schema.boards.title,
+      createdAt: schema.boards.createdAt,
+      updatedAt: schema.boards.updatedAt,
+    })
+    .from(schema.boards)
+    .where(eq(schema.boards.userId, user.id))
+    .orderBy(desc(schema.boards.updatedAt))
+  const summaries: BoardSummary[] = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  }))
+  return c.json(summaries)
+})
+
 boards.post('/', zValidator('json', CreateBoardRequest), async (c) => {
+  const user = c.get('user')!
   const { title } = c.req.valid('json')
   const id = nanoid(12)
   const [row] = await db
     .insert(schema.boards)
-    .values({ id, title: title ?? 'Untitled' })
+    .values({ id, title: title ?? 'Untitled', userId: user.id })
     .returning()
   return c.json(serialize(row), 201)
 })
 
 boards.get('/:id', async (c) => {
+  const user = c.get('user')!
   const id = c.req.param('id')
-  const [row] = await db.select().from(schema.boards).where(eq(schema.boards.id, id)).limit(1)
+  const [row] = await db
+    .select()
+    .from(schema.boards)
+    .where(and(eq(schema.boards.id, id), eq(schema.boards.userId, user.id)))
+    .limit(1)
   if (!row) return c.json({ error: 'not_found' }, 404)
   return c.json(serialize(row))
 })
 
+// Claim status for a legacy (pre-accounts) board. Behind requireAuth like all
+// of /api/*, so only signed-in users can probe. Returns claimable=false for
+// boards that don't exist or are already owned (by anyone) — it never reveals
+// the existence or ownership of a board that isn't up for grabs.
+boards.get('/:id/claim-status', async (c) => {
+  const id = c.req.param('id')
+  const board = await getClaimableBoard(id)
+  return c.json({ claimable: Boolean(board), title: board?.title ?? null })
+})
+
+// Take ownership of an ownerless board. 409 if it doesn't exist or was already
+// claimed — claimBoard is atomic (isNull guard) so a race yields exactly one winner.
+boards.post('/:id/claim', async (c) => {
+  const user = c.get('user')!
+  const id = c.req.param('id')
+  const row = await claimBoard(id, user.id)
+  if (!row) return c.json({ error: 'not_claimable' }, 409)
+  return c.json(serialize(row))
+})
+
 boards.patch('/:id', zValidator('json', UpdateBoardRequest), async (c) => {
+  const user = c.get('user')!
   const id = c.req.param('id')
   const patch = c.req.valid('json')
   const [row] = await db
@@ -59,15 +112,32 @@ boards.patch('/:id', zValidator('json', UpdateBoardRequest), async (c) => {
       ...(patch.snapshot !== undefined ? { snapshot: patch.snapshot } : {}),
       updatedAt: new Date(),
     })
-    .where(eq(schema.boards.id, id))
+    .where(and(eq(schema.boards.id, id), eq(schema.boards.userId, user.id)))
     .returning()
   if (!row) return c.json({ error: 'not_found' }, 404)
   return c.json(serialize(row))
 })
 
-boards.get('/:id/export', async (c) => {
+// Permanently delete a board. Asset/message tables cascade via their FKs.
+boards.delete('/:id', async (c) => {
+  const user = c.get('user')!
   const id = c.req.param('id')
-  const [board] = await db.select().from(schema.boards).where(eq(schema.boards.id, id)).limit(1)
+  const [row] = await db
+    .delete(schema.boards)
+    .where(and(eq(schema.boards.id, id), eq(schema.boards.userId, user.id)))
+    .returning({ id: schema.boards.id })
+  if (!row) return c.json({ error: 'not_found' }, 404)
+  return c.json({ ok: true })
+})
+
+boards.get('/:id/export', async (c) => {
+  const user = c.get('user')!
+  const id = c.req.param('id')
+  const [board] = await db
+    .select()
+    .from(schema.boards)
+    .where(and(eq(schema.boards.id, id), eq(schema.boards.userId, user.id)))
+    .limit(1)
   if (!board) return c.json({ error: 'not_found' }, 404)
 
   const images = await db
@@ -148,11 +218,12 @@ boards.get('/:id/export', async (c) => {
 })
 
 boards.delete('/:id/assets', async (c) => {
+  const user = c.get('user')!
   const id = c.req.param('id')
   const [board] = await db
     .select({ id: schema.boards.id })
     .from(schema.boards)
-    .where(eq(schema.boards.id, id))
+    .where(and(eq(schema.boards.id, id), eq(schema.boards.userId, user.id)))
     .limit(1)
   if (!board) return c.json({ error: 'not_found' }, 404)
 

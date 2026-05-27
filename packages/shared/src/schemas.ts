@@ -24,6 +24,28 @@ export const BoardResponse = z.object({
 })
 export type BoardResponse = z.infer<typeof BoardResponse>
 
+// Lightweight board record for the dashboard listing — omits the (potentially
+// large) tldraw snapshot so the list stays fast.
+export const BoardSummary = z.object({
+  id: z.string(),
+  title: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type BoardSummary = z.infer<typeof BoardSummary>
+
+export const BoardListResponse = z.array(BoardSummary)
+export type BoardListResponse = z.infer<typeof BoardListResponse>
+
+// Whether an ownerless (pre-accounts) board can be claimed by the current user.
+// `title` is the legacy board's title, shown on the claim screen; null when the
+// board isn't claimable.
+export const BoardClaimStatus = z.object({
+  claimable: z.boolean(),
+  title: z.string().nullable(),
+})
+export type BoardClaimStatus = z.infer<typeof BoardClaimStatus>
+
 // --- AI generate ---
 
 export const ChatMessage = z.object({

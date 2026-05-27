@@ -2,12 +2,13 @@
 
 An AI-native infinite whiteboard. Drop shapes on a canvas, select them, and ask Claude to reason about or generate alongside them — text, images, and video all land back on the board as movable, persistent objects.
 
-> **Status:** early / pre-1.0. Single-user, single-board-per-id, no realtime collaboration yet.
+> **Status:** early / pre-1.0. Account-gated — each user signs in and owns their own boards. No realtime collaboration yet.
 
 ---
 
 ## Features
 
+- **Accounts** — Sign in with email/password or GitHub OAuth (powered by [Better Auth](https://better-auth.com)). Boards are private to your account.
 - **AI text generation** — Cmd/Ctrl+K opens a prompt bar. Streams Claude's reply into a card on the canvas.
 - **Selection-aware context** — Selected shapes (sticky notes, text, geo, images, prior AI cards) are sent as context. Vision-capable for `image` and `ai-image` shapes.
 - **AI images** — Generate via Google Gemini 2.5 Flash Image (configurable). 1:1, 16:9, 9:16 aspects.
@@ -45,13 +46,19 @@ git clone <your-fork-url> openboard-ai
 cd openboard-ai
 
 pnpm install
-cp .env.example .env          # adjust if you want non-default ports/models
+cp .env.example .env          # adjust ports/models if you like
 pnpm db:up                    # boots Postgres on :5436
 pnpm db:migrate               # applies Drizzle migrations
 pnpm dev                      # web on :5173, api on :3001
 ```
 
-Open <http://localhost:5173>. On first load you'll be prompted for your OpenRouter API key — paste it and it's saved to `localStorage` for that browser. The key never leaves your browser except as the `X-OpenRouter-Key` header on AI requests, and is never persisted server-side.
+Before `pnpm dev`, set a session signing secret in `.env` — accounts won't work without it:
+
+```bash
+echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .env
+```
+
+Open <http://localhost:5173>. You'll first create an account or sign in (email/password, or GitHub if configured — see [Authentication](#authentication)). After signing in you're prompted for your OpenRouter API key — paste it and it's saved to `localStorage` for that browser. The key never leaves your browser except as the `X-OpenRouter-Key` header on AI requests, and is never persisted server-side.
 
 **Stop the database** with `pnpm db:down`.
 
@@ -107,11 +114,15 @@ Inside `apps/api`: `pnpm db:studio` opens Drizzle Studio.
 
 ## Configuration
 
-All optional — defaults in `.env.example` work out of the box.
+`BETTER_AUTH_SECRET` is **required**; everything else has a working default in `.env.example`.
 
 | Var | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `postgres://openboard_ai:openboard_ai@localhost:5436/openboard_ai` | Postgres connection |
+| `BETTER_AUTH_SECRET` | — (**required**) | Session signing secret; generate with `openssl rand -base64 32` |
+| `BETTER_AUTH_URL` | `http://localhost:3001` | API origin Better Auth serves from (web proxies `/api` here) |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | — | Comma-separated extra origins for deployed environments (e.g. `https://app.example.com`) |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — | Enable "Sign in with GitHub" when both are set (see below) |
 | `API_PORT` | `3001` | API server port (web proxies `/api` here) |
 | `OPENROUTER_APP_NAME` | `openboard-ai` | Sent as `X-Title` to OpenRouter (attribution) |
 | `OPENROUTER_APP_URL` | `http://localhost:5173` | Sent as `HTTP-Referer` to OpenRouter |
@@ -119,6 +130,21 @@ All optional — defaults in `.env.example` work out of the box.
 | `OPENROUTER_VIDEO_MODEL` | `google/veo-3.1-fast` | Video model id |
 
 There is intentionally **no** server-side `OPENROUTER_API_KEY` — every request carries the user's key.
+
+### Authentication
+
+Email/password sign-in works out of the box once `BETTER_AUTH_SECRET` is set. To also offer
+**Sign in with GitHub**, register an OAuth App at <https://github.com/settings/developers> →
+*New OAuth App*:
+
+- **Homepage URL:** `http://localhost:5173`
+- **Authorization callback URL:** `http://localhost:3001/api/auth/callback/github`
+  — this is the **API** origin (`BETTER_AUTH_URL`), not the web origin.
+
+Copy the Client ID and a generated Client Secret into `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
+in `.env` and restart the API. The button appears automatically when both are set. For production,
+register a second OAuth App with the public callback `https://<your-domain>/api/auth/callback/github`
+and set `BETTER_AUTH_TRUSTED_ORIGINS` to your deployed origin.
 
 ---
 

@@ -1,21 +1,26 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { zValidator } from '@hono/zod-validator'
 import { bodyLimit } from 'hono/body-limit'
 import { UploadVideoRequest } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
+import type { AuthEnv } from '../middleware/auth.js'
+import { userOwnsBoard } from '../lib/ownership.js'
 
-export const videos = new Hono()
+export const videos = new Hono<AuthEnv>()
 
 videos.get('/:id', async (c) => {
+  const user = c.get('user')!
   const id = c.req.param('id')
+  // Join through the owning board so users can only read their own assets.
   const [row] = await db
     .select({
       bytes: schema.aiVideos.bytes,
       mediaType: schema.aiVideos.mediaType,
     })
     .from(schema.aiVideos)
-    .where(eq(schema.aiVideos.id, id))
+    .innerJoin(schema.boards, eq(schema.aiVideos.boardId, schema.boards.id))
+    .where(and(eq(schema.aiVideos.id, id), eq(schema.boards.userId, user.id)))
     .limit(1)
 
   if (!row) return c.notFound()
@@ -41,14 +46,11 @@ videos.post(
   }),
   zValidator('json', UploadVideoRequest),
   async (c) => {
+    const user = c.get('user')!
     const req = c.req.valid('json')
 
-    const [board] = await db
-      .select({ id: schema.boards.id })
-      .from(schema.boards)
-      .where(eq(schema.boards.id, req.boardId))
-      .limit(1)
-    if (!board) return c.json({ error: 'board_not_found' }, 404)
+    if (!(await userOwnsBoard(req.boardId, user.id)))
+      return c.json({ error: 'board_not_found' }, 404)
 
     const bytes = Buffer.from(req.bytesBase64, 'base64')
 

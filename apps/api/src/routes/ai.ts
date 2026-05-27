@@ -29,8 +29,10 @@ import {
 import { db, schema } from '../db/client.js'
 import { DEFAULTS, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
 import { generateAndPersistHtml, persistUploadedHtml } from '../ai/html.js'
+import type { AuthEnv } from '../middleware/auth.js'
+import { userOwnsBoard } from '../lib/ownership.js'
 
-export const ai = new Hono()
+export const ai = new Hono<AuthEnv>()
 
 function requireOpenRouter(c: Context) {
   const key = c.req.header('x-openrouter-key')?.trim()
@@ -42,15 +44,28 @@ function requireOpenRouter(c: Context) {
   return { openrouter: getOpenRouter(key), apiKey: key }
 }
 
+/**
+ * Authorizes that the signed-in user owns `boardId`. Throws a 404 HTTPException
+ * (not 403) so callers don't learn whether a board id exists. Returns the
+ * board-not-found response shape used elsewhere.
+ */
+async function requireBoardOwner(c: Context, boardId: string) {
+  const user = c.get('user') as AuthEnv['Variables']['user']
+  if (!user || !(await userOwnsBoard(boardId, user.id))) {
+    throw new HTTPException(404, { res: c.json({ error: 'board_not_found' }, 404) })
+  }
+}
+
 ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
   const { messages, boardId, mode, context, resultShapeId, model } = c.req.valid('json')
+  await requireBoardOwner(c, boardId)
   const selected = model?.trim() || DEFAULTS.text
 
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   const promptText = lastUser?.content ?? ''
 
-  const imageParts = await resolveContextImages(context?.shapes ?? [])
+  const imageParts = await resolveContextImages(boardId, context?.shapes ?? [])
   const htmlSources = await resolveContextHtml(boardId, context?.shapes ?? [])
   const llmMessages = attachContextToLastUser(messages, imageParts, htmlSources)
 
@@ -128,6 +143,7 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
 ai.post('/generate-html', zValidator('json', GenerateHtmlRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
   const { boardId, prompt, title, resultShapeId, model } = c.req.valid('json')
+  await requireBoardOwner(c, boardId)
   const selected = model?.trim() || DEFAULTS.text
 
   try {
@@ -156,6 +172,7 @@ ai.post('/generate-html', zValidator('json', GenerateHtmlRequest), async (c) => 
 
 ai.post('/upload-html', zValidator('json', UploadHtmlRequest), async (c) => {
   const { boardId, title, html } = c.req.valid('json')
+  await requireBoardOwner(c, boardId)
   try {
     const { htmlId, title: resolvedTitle, byteSize } = await persistUploadedHtml({
       boardId,
@@ -188,6 +205,7 @@ const DIMS_FOR: Record<ImageAspect, { w: number; h: number }> = {
 ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
   const { boardId, prompt, aspect, resultShapeId, model } = c.req.valid('json')
+  await requireBoardOwner(c, boardId)
   const selected =
     model?.trim() || process.env.OPENROUTER_IMAGE_MODEL || DEFAULTS.image
 
@@ -254,6 +272,7 @@ ai.post('/generate-video', zValidator('json', GenerateVideoRequest), async (c) =
   const { openrouter, apiKey } = requireOpenRouter(c)
   const { boardId, prompt, aspect, generateAudio, sourceImageId, resultShapeId, model } =
     c.req.valid('json')
+  await requireBoardOwner(c, boardId)
   const selected =
     model?.trim() || process.env.OPENROUTER_VIDEO_MODEL || DEFAULTS.video
 
@@ -262,13 +281,15 @@ ai.post('/generate-video', zValidator('json', GenerateVideoRequest), async (c) =
       | { type: 'binary'; data: Uint8Array; mediaType: string }
       | undefined
     if (sourceImageId) {
+      // Scope the source image to this board so a video can't be seeded from
+      // another board's (or user's) image by spoofing a known id.
       const [src] = await db
         .select({
           bytes: schema.aiImages.bytes,
           mediaType: schema.aiImages.mediaType,
         })
         .from(schema.aiImages)
-        .where(eq(schema.aiImages.id, sourceImageId))
+        .where(and(eq(schema.aiImages.id, sourceImageId), eq(schema.aiImages.boardId, boardId)))
         .limit(1)
       if (src) {
         const srcBuf = src.bytes as Buffer
@@ -400,6 +421,7 @@ async function resolveContextHtml(
 type ImagePart = { type: 'image'; image: Uint8Array | URL; mediaType?: string }
 
 async function resolveContextImages(
+  boardId: string,
   shapes: { imageRef?: { imageId?: string; dataUrl?: string; mediaType?: string } }[],
 ): Promise<ImagePart[]> {
   const out: ImagePart[] = []
@@ -409,13 +431,15 @@ async function resolveContextImages(
     if (!ref) continue
 
     if (ref.imageId) {
+      // Scope by boardId so a client can't pull image bytes from another board
+      // into the model context by spoofing a known imageId.
       const [row] = await db
         .select({
           bytes: schema.aiImages.bytes,
           mediaType: schema.aiImages.mediaType,
         })
         .from(schema.aiImages)
-        .where(eq(schema.aiImages.id, ref.imageId))
+        .where(and(eq(schema.aiImages.id, ref.imageId), eq(schema.aiImages.boardId, boardId)))
         .limit(1)
       if (!row) continue
       const buf = row.bytes as Buffer

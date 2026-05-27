@@ -11,7 +11,8 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @openboard-ai/api db:generate",
-    "db:migrate": "pnpm --filter @openboard-ai/api db:migrate"
+    "db:migrate": "pnpm --filter @openboard-ai/api db:migrate",
+    "db:seed": "pnpm --filter @openboard-ai/api db:seed"
   },
   "engines": {
     "node": ">=22"
