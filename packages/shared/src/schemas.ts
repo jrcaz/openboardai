@@ -12,6 +12,8 @@ export const UpdateBoardRequest = z.object({
   // tldraw store snapshot is a structurally complex JSON document;
   // we accept any JSON object and let tldraw validate on load.
   snapshot: z.record(z.unknown()).optional(),
+  // Toggle public read-only sharing. Enabling mints a share token if absent.
+  isPublic: z.boolean().optional(),
 })
 export type UpdateBoardRequest = z.infer<typeof UpdateBoardRequest>
 
@@ -19,10 +21,30 @@ export const BoardResponse = z.object({
   id: z.string(),
   title: z.string(),
   snapshot: z.record(z.unknown()).nullable(),
+  // Owner-facing sharing state. `shareToken` is null until the board is first
+  // shared; the public URL is /p/:shareToken.
+  isPublic: z.boolean(),
+  shareToken: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
 export type BoardResponse = z.infer<typeof BoardResponse>
+
+// Public, anonymous view of a shared board — no owner/sharing metadata leaks.
+export const PublicBoardResponse = z.object({
+  id: z.string(),
+  title: z.string(),
+  snapshot: z.record(z.unknown()).nullable(),
+  updatedAt: z.string(),
+})
+export type PublicBoardResponse = z.infer<typeof PublicBoardResponse>
+
+// Returned by the owner's share-toggle / regenerate endpoints.
+export const ShareState = z.object({
+  isPublic: z.boolean(),
+  shareToken: z.string().nullable(),
+})
+export type ShareState = z.infer<typeof ShareState>
 
 // Lightweight board record for the dashboard listing — omits the (potentially
 // large) tldraw snapshot so the list stays fast.
