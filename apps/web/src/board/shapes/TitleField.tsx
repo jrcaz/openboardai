@@ -22,6 +22,7 @@ export function TitleField<T extends WithTitle>({
   displayClassName,
   inputClassName,
   onEditingChange,
+  readonly = false,
 }: {
   editor: Editor
   shapeId: TLShapeId
@@ -33,6 +34,7 @@ export function TitleField<T extends WithTitle>({
   displayClassName?: string
   inputClassName?: string
   onEditingChange?: (editing: boolean) => void
+  readonly?: boolean
 }) {
   const [editing, setEditingState] = useState(false)
   const setEditing = (next: boolean) => {
@@ -71,7 +73,7 @@ export function TitleField<T extends WithTitle>({
     setEditing(false)
   }
 
-  if (editing) {
+  if (editing && !readonly) {
     return (
       <input
         ref={inputRef}
@@ -105,10 +107,14 @@ export function TitleField<T extends WithTitle>({
       title={hasTitle ? prompt || undefined : undefined}
       onPointerDown={stopEventPropagation}
       onMouseDown={stopEventPropagation}
-      onDoubleClick={(e) => {
-        e.stopPropagation()
-        setEditing(true)
-      }}
+      onDoubleClick={
+        readonly
+          ? undefined
+          : (e) => {
+              e.stopPropagation()
+              setEditing(true)
+            }
+      }
     >
       {hasTitle ? title : (emptyLabel ?? prompt)}
     </span>

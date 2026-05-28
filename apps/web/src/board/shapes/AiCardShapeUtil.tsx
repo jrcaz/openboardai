@@ -13,6 +13,7 @@ import {
 import { updateCustomShape } from './customShape'
 import { TitleField } from './TitleField'
 import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
+import { useIsReadonly } from './useIsReadonly'
 
 export const AI_CARD_TYPE = 'ai-card' as const
 
@@ -69,6 +70,7 @@ export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
 
 function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor }) {
   const { prompt, text, status, w, h, title } = shape.props
+  const readonly = useIsReadonly()
   const cardRef = useRef<HTMLDivElement>(null)
   const [isHovered, setHovered] = useState(false)
   const [isEditing, setEditing] = useState(false)
@@ -102,7 +104,7 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
     }
   }, [editor, shape.id, h, w, text, status, isEditing])
 
-  const showPencil = status === 'done' && isHovered && !isEditing
+  const showPencil = status === 'done' && isHovered && !isEditing && !readonly
 
   return (
     <HTMLContainer
@@ -136,6 +138,7 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
               placeholder="Add a title"
               displayClassName="flex-1 truncate text-xs font-medium text-neutral-700 cursor-text"
               inputClassName="flex-1 min-w-0 truncate rounded bg-white/80 px-1 py-0.5 text-xs font-medium text-neutral-800 outline-none ring-1 ring-amber-300 focus:ring-amber-500"
+              readonly={readonly}
             />
             <StatusDot status={status} />
           </header>
