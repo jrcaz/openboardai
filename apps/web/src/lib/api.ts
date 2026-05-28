@@ -4,6 +4,8 @@ import type {
   BoardResponse,
   Modality,
   ModelsResponse,
+  PublicBoardResponse,
+  ShareState,
   UploadAssetResponse,
   UploadImageRequest,
   UploadVideoRequest,
@@ -38,6 +40,24 @@ export const api = {
     }).then((r) => json<BoardResponse>(r)),
 
   getBoard: (id: string) => fetch(`/api/boards/${id}`).then((r) => json<BoardResponse>(r)),
+
+  // Anonymous, read-only fetch of a publicly shared board by its share token.
+  getPublicBoard: (token: string) =>
+    fetch(`/api/public/boards/${token}`).then((r) => json<PublicBoardResponse>(r)),
+
+  // Toggle public sharing on/off. Enabling mints a share token if absent.
+  setBoardPublic: (id: string, isPublic: boolean) =>
+    fetch(`/api/boards/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ isPublic }),
+    }).then((r) => json<BoardResponse>(r)),
+
+  // Rotate the share token, permanently invalidating the previous public link.
+  regenerateShareToken: (id: string) =>
+    fetch(`/api/boards/${id}/share/regenerate`, { method: 'POST' }).then((r) =>
+      json<ShareState>(r),
+    ),
 
   // Whether a board that we can't open (404) is an ownerless legacy board the
   // current user is allowed to claim.

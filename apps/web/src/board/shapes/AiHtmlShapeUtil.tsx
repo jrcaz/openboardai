@@ -10,6 +10,8 @@ import {
   useValue,
 } from 'tldraw'
 import { EditPromptOverlay, PencilButton } from './EditPromptOverlay'
+import { useAssetBase } from '../assetBase'
+import { useIsReadonly } from './useIsReadonly'
 
 export const AI_HTML_TYPE = 'ai-html' as const
 
@@ -71,6 +73,8 @@ export class AiHtmlShapeUtil extends BaseBoxShapeUtil<AiHtmlShape> {
 
 function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
   const editor = useEditor()
+  const assetBase = useAssetBase()
+  const readonly = useIsReadonly()
   const { w, h, title, prompt, source, status, htmlId, errorMessage } = shape.props
 
   // "Interacting" means pointer events route into the iframe so the user can
@@ -117,7 +121,8 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
     !!prompt &&
     isHovered &&
     !isEditing &&
-    !isInteracting
+    !isInteracting &&
+    !readonly
 
   return (
     <HTMLContainer
@@ -135,6 +140,7 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
           source={source}
           status={status}
           htmlId={htmlId}
+          assetBase={assetBase}
           isInteracting={isInteracting}
           onToggleInteract={() => setInteracting((v) => !v)}
         />
@@ -143,7 +149,7 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
           {status === 'done' && htmlId && (
             <iframe
               key={htmlId}
-              src={`/api/htmls/${htmlId}`}
+              src={`${assetBase}/htmls/${htmlId}`}
               title={title}
               sandbox="allow-scripts"
               referrerPolicy="no-referrer"
@@ -173,6 +179,7 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
               message={errorMessage}
               shapeId={shape.id}
               source={source}
+              readonly={readonly}
             />
           )}
 
@@ -210,6 +217,7 @@ function HeaderBar({
   source,
   status,
   htmlId,
+  assetBase,
   isInteracting,
   onToggleInteract,
 }: {
@@ -217,6 +225,7 @@ function HeaderBar({
   source: 'ai' | 'upload'
   status: AiHtmlStatus
   htmlId: string | null
+  assetBase: string
   isInteracting: boolean
   onToggleInteract: () => void
 }) {
@@ -262,7 +271,7 @@ function HeaderBar({
               {isInteracting ? 'Interacting' : 'Interact'}
             </button>
             <a
-              href={`/api/htmls/${htmlId}`}
+              href={`${assetBase}/htmls/${htmlId}`}
               target="_blank"
               rel="noreferrer noopener"
               onPointerDown={stopEventPropagation}
@@ -328,11 +337,13 @@ function ErrorLayer({
   message,
   shapeId,
   source,
+  readonly,
 }: {
   prompt: string | null
   message: string | null
   shapeId: string
   source: 'ai' | 'upload'
+  readonly: boolean
 }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-red-50 to-rose-50 px-4 text-center">
@@ -363,7 +374,7 @@ function ErrorLayer({
           </p>
         )}
       </div>
-      {source === 'ai' && prompt && (
+      {source === 'ai' && prompt && !readonly && (
         <button
           onPointerDown={stopEventPropagation}
           onClick={(e) => {

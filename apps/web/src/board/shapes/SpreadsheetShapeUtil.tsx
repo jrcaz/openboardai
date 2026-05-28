@@ -12,6 +12,7 @@ import {
   useValue,
 } from 'tldraw'
 import { updateCustomShape } from './customShape'
+import { useIsReadonly } from './useIsReadonly'
 import { evaluateSheet, isErrorDisplay } from './spreadsheet/formula'
 import { MAX_COLS, MAX_ROWS, cellKey, colLabel } from './spreadsheet/grid'
 
@@ -122,6 +123,11 @@ function SpreadsheetComponent({ shape }: { shape: SpreadsheetShape }) {
     () => editor.getOnlySelectedShapeId() === shape.id,
     [editor, shape.id],
   )
+
+  // In read-only mode (e.g. the public shared-board viewer) the sheet is view-
+  // only — local edits would update the in-memory store but never persist, which
+  // would mislead viewers. Suppress all edit affordances.
+  const isReadonly = useIsReadonly()
 
   // Leaving the selection drops interact mode (mirrors ai-html behavior).
   useEffect(() => {
@@ -289,7 +295,7 @@ function SpreadsheetComponent({ shape }: { shape: SpreadsheetShape }) {
         <HeaderBar
           title={title}
           isInteracting={isInteracting}
-          showToggle={isHovered || isSelected || isInteracting}
+          showToggle={!isReadonly && (isHovered || isSelected || isInteracting)}
           hasActiveCell={!!active}
           activeLabel={active ? cellKey(active.c, active.r) : ''}
           formulaValue={activeRaw}
@@ -400,8 +406,9 @@ function SpreadsheetComponent({ shape }: { shape: SpreadsheetShape }) {
           </div>
 
           {/* When not interacting, a transparent layer offers double-click to edit
-              while leaving single pointer events for the canvas (drag via header). */}
-          {!isInteracting && (
+              while leaving single pointer events for the canvas (drag via header).
+              Disabled in read-only mode (e.g. public shared boards). */}
+          {!isInteracting && !isReadonly && (
             <div
               className="absolute inset-0 cursor-cell"
               onPointerDown={stopEventPropagation}
