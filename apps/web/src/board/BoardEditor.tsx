@@ -34,6 +34,7 @@ import { useToolsVisible } from './useToolsVisible'
 import { FileMenu } from './FileMenu'
 import { BoardLoading } from './BoardLoading'
 import { ShareButton } from './ShareButton'
+import { ProjectsSidebar } from './ProjectsSidebar'
 
 const customTools = [SpreadsheetShapeTool]
 
@@ -347,6 +348,7 @@ export function BoardEditor({ boardId }: Props) {
         onMount={handleMount}
         licenseKey={TLDRAW_LICENSE_KEY || undefined}
       />
+      <ProjectsSidebar boardId={boardId} isPresenting={isPresenting} />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
         <ShareButton
