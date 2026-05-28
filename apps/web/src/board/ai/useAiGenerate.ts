@@ -6,6 +6,11 @@ import {
   AI_HTML_TYPE,
   type AiHtmlShape,
 } from '../shapes/AiHtmlShapeUtil'
+import {
+  SPREADSHEET_TYPE,
+  type SpreadsheetShape,
+} from '../shapes/SpreadsheetShapeUtil'
+import { dataToCells } from '../shapes/spreadsheet/grid'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import {
   createConnectingArrow,
@@ -121,9 +126,12 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
         }
       })
 
-      // Track htmlId for each tool call so we can update the right shape when
-      // the tool's output arrives.
-      const toolCallShapes = new Map<string, TLShapeId>()
+      // Track the shape created for each tool call (and its kind) so we can
+      // update the right shape when the tool's output arrives.
+      const toolCallShapes = new Map<
+        string,
+        { id: TLShapeId; kind: 'html' | 'spreadsheet' }
+      >()
 
       try {
         const modelPref = getModelPreference('text')
@@ -179,12 +187,63 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
           if (
             chunk.type === 'tool-input-available' &&
+            chunk.toolName === 'create_spreadsheet' &&
+            chunk.toolCallId
+          ) {
+            const input = chunk.input as { title?: string; data?: string[][] }
+            const data = Array.isArray(input.data) ? input.data : []
+            const { cells, rows, cols } = dataToCells(data)
+            const sheetShapeId = createShapeId()
+            toolCallShapes.set(chunk.toolCallId, {
+              id: sheetShapeId,
+              kind: 'spreadsheet',
+            })
+
+            const cardBounds = editor.getShapePageBounds(cardId)
+            const sheetAnchor = cardBounds
+              ? { x: cardBounds.maxX + HTML_GAP, y: cardBounds.minY }
+              : { x: anchor.x + w + HTML_GAP, y: anchor.y }
+
+            // Size to content within sane bounds (44 ≈ row-header, 78 ≈ header
+            // bar + column header; 96/26 match the grid's default cell metrics).
+            const sw = Math.min(760, 44 + cols * 96)
+            const sh = Math.min(460, 78 + rows * 26)
+
+            editor.run(
+              () => {
+                createCustomShape<SpreadsheetShape>(editor, {
+                  id: sheetShapeId,
+                  type: SPREADSHEET_TYPE,
+                  x: sheetAnchor.x,
+                  y: sheetAnchor.y,
+                  props: {
+                    w: sw,
+                    h: sh,
+                    title: (input.title ?? 'Spreadsheet').slice(0, 120),
+                    rows,
+                    cols,
+                    cells,
+                    colWidths: {},
+                  },
+                })
+                createConnectingArrow(editor, cardId as string, sheetShapeId)
+              },
+              { history: 'ignore' },
+            )
+            continue
+          }
+
+          if (
+            chunk.type === 'tool-input-available' &&
             chunk.toolName === 'create_html' &&
             chunk.toolCallId
           ) {
             const input = chunk.input as { title?: string; prompt?: string }
             const htmlShapeId = createShapeId()
-            toolCallShapes.set(chunk.toolCallId, htmlShapeId)
+            toolCallShapes.set(chunk.toolCallId, {
+              id: htmlShapeId,
+              kind: 'html',
+            })
 
             const cardBounds = editor.getShapePageBounds(cardId)
             const htmlAnchor = cardBounds
@@ -217,8 +276,11 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
           }
 
           if (chunk.type === 'tool-output-available' && chunk.toolCallId) {
-            const htmlShapeId = toolCallShapes.get(chunk.toolCallId)
-            if (!htmlShapeId) continue
+            const entry = toolCallShapes.get(chunk.toolCallId)
+            // Spreadsheets are fully built from the tool input above — nothing
+            // to do when their output arrives.
+            if (!entry || entry.kind !== 'html') continue
+            const htmlShapeId = entry.id
             const output = chunk.output as
               | { ok: true; htmlId: string; title: string; url: string }
               | { ok: false; error: string }
@@ -254,8 +316,9 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
           }
 
           if (chunk.type === 'tool-output-error' && chunk.toolCallId) {
-            const htmlShapeId = toolCallShapes.get(chunk.toolCallId)
-            if (!htmlShapeId) continue
+            const entry = toolCallShapes.get(chunk.toolCallId)
+            if (!entry || entry.kind !== 'html') continue
+            const htmlShapeId = entry.id
             editor.run(
               () => {
                 updateCustomShape<AiHtmlShape>(editor, {
