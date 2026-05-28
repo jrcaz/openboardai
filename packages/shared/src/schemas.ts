@@ -206,6 +206,22 @@ export const UploadHtmlResponse = z.object({
 })
 export type UploadHtmlResponse = z.infer<typeof UploadHtmlResponse>
 
+// --- AI spreadsheet generation ---
+
+// Bounds for an AI-emitted spreadsheet payload. Kept conservative so a single
+// tool call can't balloon the board snapshot; the client clamps to the grid's
+// own MAX_ROWS/MAX_COLS as well.
+export const MAX_SPREADSHEET_ROWS = 100
+export const MAX_SPREADSHEET_COLS = 26
+const MAX_CELL_CHARS = 1000
+
+// A 2D array of raw cell strings — each entry is a literal value or an Excel-
+// style formula (e.g. "=SUM(B2:B7)"). Row 0 is typically the header row.
+export const SpreadsheetData = z
+  .array(z.array(z.string().max(MAX_CELL_CHARS)).max(MAX_SPREADSHEET_COLS))
+  .max(MAX_SPREADSHEET_ROWS)
+export type SpreadsheetData = z.infer<typeof SpreadsheetData>
+
 // --- OpenRouter model catalog ---
 
 export const Modality = z.enum(['text', 'image', 'video'])
