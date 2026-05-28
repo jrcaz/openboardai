@@ -14,6 +14,7 @@ import { importHtmlFile, isHtmlFile } from './ai/useAiHtmlImport'
 import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
+import { AgentKeysButton } from '../settings/AgentKeysButton'
 import { SettingsButton } from '../settings/SettingsButton'
 import { UserMenu } from '../components/UserMenu'
 import { GitHubBadge } from './GitHubBadge'
@@ -304,6 +305,7 @@ export function BoardEditor({ boardId }: Props) {
         />
         <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
+        <AgentKeysButton />
         <SettingsButton />
         <div className="pointer-events-auto">
           <UserMenu />
