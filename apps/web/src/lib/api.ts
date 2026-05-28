@@ -1,7 +1,9 @@
 import type {
+  ApiKeySummary,
   BoardClaimStatus,
   BoardListResponse,
   BoardResponse,
+  CreatedApiKey,
   Modality,
   ModelsResponse,
   PublicBoardResponse,
@@ -133,4 +135,21 @@ export const api = {
     })
     return json<ModelsResponse>(res)
   },
+
+  // --- Programmatic-access API keys for external AI agents.
+  // The plaintext secret is returned ONCE by `createApiKey` and never again.
+
+  listApiKeys: () => fetch('/api/keys').then((r) => json<ApiKeySummary[]>(r)),
+
+  createApiKey: (name: string) =>
+    fetch('/api/keys', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).then((r) => json<CreatedApiKey>(r)),
+
+  revokeApiKey: (id: string) =>
+    fetch(`/api/keys/${id}`, { method: 'DELETE' }).then((r) =>
+      json<{ ok: true }>(r),
+    ),
 }

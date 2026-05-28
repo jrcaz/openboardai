@@ -210,6 +210,55 @@ body,
   padding-top: 60px;
 }
 
+/* Make room for the ProjectsSidebar toggle, which sits flush at top:0 left:0
+   as a 40px tile styled to match tldraw's .tlui-menu-zone (see
+   board/ProjectsSidebar.tsx). The tldraw menu zone slides right by exactly
+   the button's width so the two tiles read as a single attached row. */
+.app-shell .tlui-layout__top__left {
+  padding-left: 40px;
+}
+
+/* In presentation mode the toggle is unmounted, so drop the left padding to
+   avoid an offset coordinate space for tldraw's hidden top chrome. */
+.app-shell.is-presenting .tlui-layout__top__left {
+  padding-left: 0;
+}
+
+/* ProjectsSidebar toggle — visually a sibling of tldraw's .tlui-menu-zone:
+   same low-contrast bg, same rounded bottom-right, same white separator
+   borders so the two tiles look like one continuous chrome strip. */
+.projects-sidebar-toggle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 510;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background-color: var(--tl-color-low, hsl(204 14% 96%));
+  color: var(--tl-color-text-1, #1f2937);
+  border: 0;
+  border-right: 2px solid var(--tl-color-background, #fff);
+  border-bottom: 2px solid var(--tl-color-background, #fff);
+  border-bottom-right-radius: var(--tl-radius-4, 12px);
+  cursor: pointer;
+  transition: background-color 120ms ease-out, opacity 150ms ease-out;
+}
+.projects-sidebar-toggle:hover {
+  background-color: var(--tl-color-muted-2, hsl(204 14% 93%));
+}
+.projects-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--tl-color-focus, #3b82f6);
+  outline-offset: -4px;
+  border-radius: 8px;
+}
+.projects-sidebar-toggle[data-expanded='true'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Hide tldraw's left-side toolbar / top menu while presenting so the canvas
    reads as a clean surface. The PresentationToggle (top-right) stays. */
 .app-shell.is-presenting .tlui-layout__top,

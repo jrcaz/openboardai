@@ -206,6 +206,22 @@ export const UploadHtmlResponse = z.object({
 })
 export type UploadHtmlResponse = z.infer<typeof UploadHtmlResponse>
 
+// --- AI spreadsheet generation ---
+
+// Bounds for an AI-emitted spreadsheet payload. Kept conservative so a single
+// tool call can't balloon the board snapshot; the client clamps to the grid's
+// own MAX_ROWS/MAX_COLS as well.
+export const MAX_SPREADSHEET_ROWS = 100
+export const MAX_SPREADSHEET_COLS = 26
+const MAX_CELL_CHARS = 1000
+
+// A 2D array of raw cell strings — each entry is a literal value or an Excel-
+// style formula (e.g. "=SUM(B2:B7)"). Row 0 is typically the header row.
+export const SpreadsheetData = z
+  .array(z.array(z.string().max(MAX_CELL_CHARS)).max(MAX_SPREADSHEET_COLS))
+  .max(MAX_SPREADSHEET_ROWS)
+export type SpreadsheetData = z.infer<typeof SpreadsheetData>
+
 // --- OpenRouter model catalog ---
 
 export const Modality = z.enum(['text', 'image', 'video'])
@@ -300,3 +316,97 @@ export const UploadAssetResponse = z.object({
   id: z.string(),
 })
 export type UploadAssetResponse = z.infer<typeof UploadAssetResponse>
+
+// --- Agent surface ---
+//
+// Programmatic access for external AI agents (Claude Desktop, Cursor, custom
+// agents) authenticated via a per-user API key. The shapes here are kept
+// deliberately small and stable — the agent surface is a contract with
+// third-party clients.
+
+export const AgentBoardSummary = z.object({
+  id: z.string(),
+  title: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type AgentBoardSummary = z.infer<typeof AgentBoardSummary>
+
+export const AgentItem = z.object({
+  id: z.string(),
+  type: z.string(),
+  text: z.string(),
+  x: z.number(),
+  y: z.number(),
+  w: z.number().optional(),
+  h: z.number().optional(),
+})
+export type AgentItem = z.infer<typeof AgentItem>
+
+export const AgentBoardContent = z.object({
+  id: z.string(),
+  title: z.string(),
+  updatedAt: z.string(),
+  items: z.array(AgentItem),
+  // Raw tldraw snapshot, only when ?include=snapshot. Most agents want the
+  // flattened `items` view; the raw snapshot is for clients that need byte-
+  // identical board copies (e.g. forking, export pipelines).
+  snapshot: z.record(z.unknown()).nullable().optional(),
+})
+export type AgentBoardContent = z.infer<typeof AgentBoardContent>
+
+export const AgentAddItemRequest = z.object({
+  kind: z.enum(['text', 'note']).default('note'),
+  text: z.string().trim().min(1).max(4000),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  color: z.string().optional(),
+})
+export type AgentAddItemRequest = z.infer<typeof AgentAddItemRequest>
+
+export const AgentAddItemResponse = z.object({
+  shapeId: z.string(),
+})
+export type AgentAddItemResponse = z.infer<typeof AgentAddItemResponse>
+
+export const AgentGenerateRequest = z.object({
+  kind: z.enum(['text', 'image', 'html']),
+  prompt: z.string().trim().min(1).max(4000),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  model: z.string().min(1).max(200).optional(),
+  title: z.string().trim().max(120).optional(),
+})
+export type AgentGenerateRequest = z.infer<typeof AgentGenerateRequest>
+
+export const AgentGenerateResponse = z.object({
+  kind: z.enum(['text', 'image', 'html']),
+  shapeId: z.string(),
+  assetId: z.string().optional(),
+  url: z.string().optional(),
+  text: z.string().optional(),
+})
+export type AgentGenerateResponse = z.infer<typeof AgentGenerateResponse>
+
+// --- API key management (owner-facing, session-authed) ---
+
+export const ApiKeySummary = z.object({
+  id: z.string(),
+  name: z.string(),
+  prefix: z.string(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+})
+export type ApiKeySummary = z.infer<typeof ApiKeySummary>
+
+export const CreateApiKeyRequest = z.object({
+  name: z.string().trim().min(1).max(80),
+})
+export type CreateApiKeyRequest = z.infer<typeof CreateApiKeyRequest>
+
+export const CreatedApiKey = ApiKeySummary.extend({
+  // The plaintext secret, returned ONCE on creation. Clients must surface it
+  // to the user immediately and never persist it server-side.
+  plaintext: z.string(),
+})
+export type CreatedApiKey = z.infer<typeof CreatedApiKey>

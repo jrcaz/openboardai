@@ -4,7 +4,6 @@ import { HTTPException } from 'hono/http-exception'
 import { zValidator } from '@hono/zod-validator'
 import {
   experimental_generateVideo as generateVideo,
-  generateImage,
   stepCountIs,
   streamText,
   tool,
@@ -18,11 +17,11 @@ import {
   GenerateImageRequest,
   GenerateRequest,
   GenerateVideoRequest,
+  SpreadsheetData,
   UploadHtmlRequest,
   type GenerateHtmlResponse,
   type GenerateImageResponse,
   type GenerateVideoResponse,
-  type ImageAspect,
   type UploadHtmlResponse,
   type VideoAspect,
 } from '@openboard-ai/shared'
@@ -30,6 +29,7 @@ import { db, schema } from '../db/client.js'
 import { DEFAULTS, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
 import { generateAndPersistHtml, persistUploadedHtml } from '../ai/html.js'
 import { fetchUrlForModel } from '../ai/fetchUrl.js'
+import { generateAndPersistImage } from '../ai/image.js'
 import type { AuthEnv } from '../middleware/auth.js'
 import { userOwnsBoard } from '../lib/ownership.js'
 
@@ -71,9 +71,35 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   const llmMessages = attachContextToLastUser(messages, imageParts, htmlSources)
 
   const tools = {
+    create_spreadsheet: tool({
+      description:
+        'Create an EDITABLE spreadsheet/grid on the canvas alongside your text reply. ' +
+        'Use when the user wants a data table, dataset, budget, schedule, comparison, or anything tabular with numbers they may want to recompute or edit. ' +
+        'Prefer this over create_html for tabular/numeric data. Each cell is a literal value (text/number) OR an Excel-style formula. ' +
+        'For ANY computed cell (totals, averages, growth, differences) emit a formula like "=SUM(B2:B7)", "=A1*1.1", "=AVERAGE(C2:C10)", "=B2-C2" so the sheet stays live when the user edits inputs. ' +
+        'Supported functions ONLY: SUM, AVERAGE, MIN, MAX, COUNT, IF, CONCAT, ROUND, ABS (plus + - * / ^, comparisons, and cell ranges like A1:A10). Do not use other functions. ' +
+        'Row 0 is the header labels. Refer to cells in A1 notation (row 1 = headers, so data starts at row 2). Single tool call per turn. Continue your text reply after calling the tool.',
+      inputSchema: z.object({
+        title: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe('A short label for the spreadsheet (under 8 words).'),
+        data: SpreadsheetData.describe(
+          'A 2D array of rows. Each entry is a raw cell value or an =formula. Row 0 holds the column headers. Keep it focused (max 100 rows x 26 columns).',
+        ),
+      }),
+      execute: async ({ title, data }) => {
+        // The grid data lives in the shape's tldraw props (built on the client
+        // from this tool input), so there is nothing to persist server-side.
+        // Echo a normalized summary back to the model + client.
+        const cols = data.reduce((m, row) => Math.max(m, row.length), 0)
+        return { ok: true as const, title, rows: data.length, cols }
+      },
+    }),
     create_html: tool({
       description:
-        "Create a self-contained interactive HTML widget on the canvas alongside your text reply. Use ONLY when the user explicitly asks for HTML, an interactive demo, a chart, a sortable/styled table, a dashboard, or any visual UI that markdown can't express. Single tool call per turn. Continue your text reply after calling the tool — describe what you placed on the canvas.",
+        "Create a self-contained interactive HTML widget on the canvas alongside your text reply. Use ONLY when the user explicitly asks for HTML, an interactive demo, a chart/graph, a dashboard, or a styled/visual UI that markdown can't express. For plain tabular or numeric data that the user may edit or recompute, prefer the create_spreadsheet tool instead. Single tool call per turn. Continue your text reply after calling the tool — describe what you placed on the canvas.",
       inputSchema: z.object({
         title: z
           .string()
@@ -202,58 +228,33 @@ ai.post('/upload-html', zValidator('json', UploadHtmlRequest), async (c) => {
   }
 })
 
-// Recorded dimensions per aspect — OpenRouter's image SDK ignores `size` and
-// only accepts `aspectRatio`, so these are nominal canvas dimensions we persist
-// for layout (the actual returned image bytes carry their own intrinsic size).
-const DIMS_FOR: Record<ImageAspect, { w: number; h: number }> = {
-  '1:1': { w: 1024, h: 1024 },
-  '16:9': { w: 1536, h: 864 },
-  '9:16': { w: 864, h: 1536 },
-}
-
 ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
   const { boardId, prompt, aspect, resultShapeId, model } = c.req.valid('json')
   await requireBoardOwner(c, boardId)
-  const selected =
-    model?.trim() || process.env.OPENROUTER_IMAGE_MODEL || DEFAULTS.image
 
   try {
-    const dims = DIMS_FOR[aspect]
-    const { image } = await generateImage({
-      model: openrouter.imageModel(selected),
-      prompt,
-      aspectRatio: aspect,
-    })
-
-    const id = nanoid(12)
-    const mediaType = image.mediaType ?? 'image/png'
-    const bytes = Buffer.from(image.uint8Array)
-
-    await db.insert(schema.aiImages).values({
-      id,
+    const persisted = await generateAndPersistImage({
+      openrouter,
       boardId,
       prompt,
-      model: selected,
-      width: dims.w,
-      height: dims.h,
-      mediaType,
-      bytes,
-      resultShapeId: resultShapeId ?? null,
+      aspect,
+      model,
+      resultShapeId,
     })
-
     const body: GenerateImageResponse = {
-      imageId: id,
-      url: `/api/images/${id}`,
-      width: dims.w,
-      height: dims.h,
-      mediaType,
-      prompt,
+      imageId: persisted.imageId,
+      url: `/api/images/${persisted.imageId}`,
+      width: persisted.width,
+      height: persisted.height,
+      mediaType: persisted.mediaType,
+      prompt: persisted.prompt,
     }
     return c.json(body)
   } catch (err) {
     console.error('[ai] image generation failed', err)
     const raw = err instanceof Error ? err.message : 'unknown'
+    const selected = model?.trim() || process.env.OPENROUTER_IMAGE_MODEL || DEFAULTS.image
     // OpenRouter occasionally returns 200 with an empty body for some image
     // models. Surface a hint instead of the raw JSON-parse error.
     const message = /Unexpected end of JSON input|Invalid JSON response/.test(raw)
