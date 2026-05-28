@@ -117,6 +117,22 @@ body,
   border-radius: 6px;
 }
 
+/* --- Markdown shape: source editor --- */
+
+.md-shape-textarea {
+  width: 100%;
+  padding: 0.5em 0.75em;
+  border: none;
+  outline: none;
+  resize: none;
+  background: #fff;
+  color: #1f2937;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
 /* --- AI image generation: placeholder animations --- */
 
 @keyframes ai-image-shimmer {
