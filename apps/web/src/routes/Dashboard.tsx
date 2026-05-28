@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'wouter'
 import type { BoardSummary } from '@openboard-ai/shared'
 import { api } from '../lib/api'
+import { relativeTime } from '../lib/relativeTime'
 import { downloadBlob } from '../board/io/obx'
 import { BrandMark } from './landing/BrandMark'
 import { UserMenu } from '../components/UserMenu'
@@ -534,20 +535,6 @@ function ConfirmDeleteDialog({
 }
 
 // --- helpers ---
-
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime()
-  const diff = Date.now() - then
-  const min = Math.round(diff / 60000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min} min ago`
-  const hr = Math.round(min / 60)
-  if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`
-  const day = Math.round(hr / 24)
-  if (day === 1) return 'yesterday'
-  if (day < 7) return `${day} days ago`
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 function safeName(title: string): string {
   return title.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '_') || 'board'
