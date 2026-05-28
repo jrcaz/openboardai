@@ -3,6 +3,7 @@ import { Landing } from './routes/Landing'
 import { BoardPage } from './routes/Board'
 import { Dashboard } from './routes/Dashboard'
 import { Login } from './routes/Login'
+import { SettingsPage } from './routes/Settings'
 import { Signup } from './routes/Signup'
 import { PublicBoardViewer } from './board/PublicBoardViewer'
 import { AuthGate } from './components/AuthGate'
@@ -21,6 +22,11 @@ export function App() {
           <Route path="/dashboard">
             <AuthGate>
               <Dashboard />
+            </AuthGate>
+          </Route>
+          <Route path="/settings/:section?">
+            <AuthGate>
+              <SettingsPage />
             </AuthGate>
           </Route>
           <Route path="/b/:boardId">
