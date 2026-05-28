@@ -126,6 +126,24 @@ export const aiHtmls = pgTable('ai_htmls', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// Per-user API keys for programmatic access by external AI agents. Only the
+// SHA-256 hash of the secret is stored; the plaintext is shown once on creation
+// and never persisted. `prefix` is the first 8 chars of the secret, kept in
+// plaintext so the UI can show users which key is which without exposing the
+// secret.
+export const apiKeys = pgTable('api_keys', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  prefix: text('prefix').notNull(),
+  keyHash: text('key_hash').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+})
+
 export const aiVideos = pgTable('ai_videos', {
   id: text('id').primaryKey(),
   boardId: text('board_id')
