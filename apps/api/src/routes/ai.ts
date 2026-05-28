@@ -4,7 +4,6 @@ import { HTTPException } from 'hono/http-exception'
 import { zValidator } from '@hono/zod-validator'
 import {
   experimental_generateVideo as generateVideo,
-  generateImage,
   stepCountIs,
   streamText,
   tool,
@@ -23,13 +22,13 @@ import {
   type GenerateHtmlResponse,
   type GenerateImageResponse,
   type GenerateVideoResponse,
-  type ImageAspect,
   type UploadHtmlResponse,
   type VideoAspect,
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
 import { DEFAULTS, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
 import { generateAndPersistHtml, persistUploadedHtml } from '../ai/html.js'
+import { generateAndPersistImage } from '../ai/image.js'
 import type { AuthEnv } from '../middleware/auth.js'
 import { userOwnsBoard } from '../lib/ownership.js'
 
@@ -220,58 +219,33 @@ ai.post('/upload-html', zValidator('json', UploadHtmlRequest), async (c) => {
   }
 })
 
-// Recorded dimensions per aspect — OpenRouter's image SDK ignores `size` and
-// only accepts `aspectRatio`, so these are nominal canvas dimensions we persist
-// for layout (the actual returned image bytes carry their own intrinsic size).
-const DIMS_FOR: Record<ImageAspect, { w: number; h: number }> = {
-  '1:1': { w: 1024, h: 1024 },
-  '16:9': { w: 1536, h: 864 },
-  '9:16': { w: 864, h: 1536 },
-}
-
 ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
   const { boardId, prompt, aspect, resultShapeId, model } = c.req.valid('json')
   await requireBoardOwner(c, boardId)
-  const selected =
-    model?.trim() || process.env.OPENROUTER_IMAGE_MODEL || DEFAULTS.image
 
   try {
-    const dims = DIMS_FOR[aspect]
-    const { image } = await generateImage({
-      model: openrouter.imageModel(selected),
-      prompt,
-      aspectRatio: aspect,
-    })
-
-    const id = nanoid(12)
-    const mediaType = image.mediaType ?? 'image/png'
-    const bytes = Buffer.from(image.uint8Array)
-
-    await db.insert(schema.aiImages).values({
-      id,
+    const persisted = await generateAndPersistImage({
+      openrouter,
       boardId,
       prompt,
-      model: selected,
-      width: dims.w,
-      height: dims.h,
-      mediaType,
-      bytes,
-      resultShapeId: resultShapeId ?? null,
+      aspect,
+      model,
+      resultShapeId,
     })
-
     const body: GenerateImageResponse = {
-      imageId: id,
-      url: `/api/images/${id}`,
-      width: dims.w,
-      height: dims.h,
-      mediaType,
-      prompt,
+      imageId: persisted.imageId,
+      url: `/api/images/${persisted.imageId}`,
+      width: persisted.width,
+      height: persisted.height,
+      mediaType: persisted.mediaType,
+      prompt: persisted.prompt,
     }
     return c.json(body)
   } catch (err) {
     console.error('[ai] image generation failed', err)
     const raw = err instanceof Error ? err.message : 'unknown'
+    const selected = model?.trim() || process.env.OPENROUTER_IMAGE_MODEL || DEFAULTS.image
     // OpenRouter occasionally returns 200 with an empty body for some image
     // models. Surface a hint instead of the raw JSON-parse error.
     const message = /Unexpected end of JSON input|Invalid JSON response/.test(raw)

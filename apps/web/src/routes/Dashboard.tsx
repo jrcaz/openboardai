@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation } from 'wouter'
+import { Link, useLocation } from 'wouter'
 import type { BoardSummary } from '@openboard-ai/shared'
 import { api } from '../lib/api'
 import { relativeTime } from '../lib/relativeTime'
@@ -104,7 +104,15 @@ export function Dashboard() {
               OpenBoard AI
             </span>
           </a>
-          <UserMenu />
+          <div className="flex items-center gap-2">
+            <Link
+              href="/settings"
+              className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              Settings
+            </Link>
+            <UserMenu />
+          </div>
         </div>
       </header>
 

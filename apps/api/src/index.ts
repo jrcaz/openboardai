@@ -7,11 +7,19 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auth, socialProviders } from './auth.js'
-import { requireAuth, sessionMiddleware, type AuthEnv } from './middleware/auth.js'
+import {
+  bearerOrSessionMiddleware,
+  requireAuth,
+  sessionMiddleware,
+  type AuthEnv,
+} from './middleware/auth.js'
+import { agent } from './routes/agent.js'
 import { ai } from './routes/ai.js'
 import { boards } from './routes/boards.js'
 import { htmls } from './routes/htmls.js'
 import { images } from './routes/images.js'
+import { keys } from './routes/keys.js'
+import { mcp } from './routes/mcp.js'
 import { models } from './routes/models.js'
 import { publicBoards } from './routes/public.js'
 import { settings } from './routes/settings.js'
@@ -35,14 +43,24 @@ app.use(
     origin: corsOrigins,
     credentials: true,
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'X-OpenRouter-Key'],
+    allowHeaders: ['Content-Type', 'X-OpenRouter-Key', 'Authorization', 'Mcp-Session-Id'],
+    exposeHeaders: ['Mcp-Session-Id'],
   }),
 )
 
 app.get('/health', (c) => c.json({ ok: true }))
 
-// Populate user/session for every API request, then mount Better Auth's own
-// handler (sign-up / sign-in / sign-out / session). Auth routes stay public.
+// Programmatic agent surfaces support BOTH a Better Auth session cookie AND
+// `Authorization: Bearer <api-key>`. Mount their auth chain first so it isn't
+// overridden by the cookie-only chain below.
+app.use('/api/agent/*', bearerOrSessionMiddleware, requireAuth)
+app.use('/api/mcp', bearerOrSessionMiddleware, requireAuth)
+app.use('/api/mcp/*', bearerOrSessionMiddleware, requireAuth)
+app.route('/api/agent/v1', agent)
+app.route('/api/mcp', mcp)
+
+// Populate user/session for every other API request, then mount Better Auth's
+// own handler (sign-up / sign-in / sign-out / session). Auth routes stay public.
 app.use('/api/*', sessionMiddleware)
 app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
 
@@ -66,6 +84,7 @@ app.route('/api/videos', videos)
 app.route('/api/htmls', htmls)
 app.route('/api/settings', settings)
 app.route('/api/models', models)
+app.route('/api/keys', keys)
 
 const webDist = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 const indexHtmlPath = join(webDist, 'index.html')
