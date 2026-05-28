@@ -8,6 +8,7 @@ import {
   type TLRichText,
 } from 'tldraw'
 import type { BoardShapeIndexEntry } from '@openboard-ai/shared'
+import { sheetToText } from '../shapes/spreadsheet/formula'
 
 // tldraw's `toRichText` helper lives in @tldraw/tlschema and is NOT re-exported
 // by the top-level `tldraw` barrel (our only tldraw dependency), so we inline
@@ -120,6 +121,19 @@ export function extractShapeText(editor: Editor, shape: TLShape): string {
       parts.push(`(status: ${props.status} — no rendered content available yet)`)
     }
     return parts.join('\n')
+  }
+  // Spreadsheets carry their data in props; serialize computed values to a
+  // compact tab-separated grid the model can read.
+  if (shapeType === 'spreadsheet') {
+    const props = shape.props as {
+      title?: string
+      cells?: Record<string, string>
+      rows?: number
+      cols?: number
+    }
+    const label = `[Spreadsheet — title: "${props.title ?? 'Spreadsheet'}"]`
+    const grid = sheetToText(props.cells ?? {}, props.rows ?? 0, props.cols ?? 0)
+    return `${label}\n${grid}`
   }
   const props = shape.props as Record<string, unknown>
   if (typeof props.text === 'string') return props.text
