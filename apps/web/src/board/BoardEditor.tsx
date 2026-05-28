@@ -23,6 +23,7 @@ import {
 } from './shapes/SpreadsheetShapeUtil'
 import { AiPromptBar } from './ai/AiPromptBar'
 import { importHtmlFile, isHtmlFile } from './ai/useAiHtmlImport'
+import { importMarkdownFile, isMarkdownFile } from './ai/useMarkdownImport'
 import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
@@ -189,13 +190,18 @@ export function BoardEditor({ boardId }: Props) {
 
       ed.registerExternalContentHandler('files', async (info) => {
         const htmlFiles: File[] = []
+        const markdownFiles: File[] = []
         const otherFiles: File[] = []
         for (const f of info.files) {
           if (isHtmlFile(f)) htmlFiles.push(f)
+          else if (isMarkdownFile(f)) markdownFiles.push(f)
           else otherFiles.push(f)
         }
         for (const f of htmlFiles) {
           await importHtmlFile(ed, f, { boardId, point: info.point })
+        }
+        for (const f of markdownFiles) {
+          await importMarkdownFile(ed, f, { point: info.point })
         }
         if (otherFiles.length > 0 && defaultFiles) {
           await defaultFiles({ ...info, files: otherFiles } as unknown)
