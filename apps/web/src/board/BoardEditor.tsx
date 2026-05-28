@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  DefaultToolbar,
+  DefaultToolbarContent,
   Tldraw,
+  TldrawUiMenuItem,
   type Editor,
+  type TLComponents,
   type TLStoreSnapshot,
+  type TLUiAssetUrlOverrides,
+  type TLUiOverrides,
   getSnapshot,
   loadSnapshot,
+  useIsToolSelected,
+  useTools,
 } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
@@ -13,6 +21,11 @@ import { AiCardShapeUtil } from './shapes/AiCardShapeUtil'
 import { AiHtmlShapeUtil } from './shapes/AiHtmlShapeUtil'
 import { AiImageShapeUtil } from './shapes/AiImageShapeUtil'
 import { AiVideoShapeUtil } from './shapes/AiVideoShapeUtil'
+import {
+  SPREADSHEET_TYPE,
+  SpreadsheetShapeTool,
+  SpreadsheetShapeUtil,
+} from './shapes/SpreadsheetShapeUtil'
 import { AiPromptBar } from './ai/AiPromptBar'
 import { importHtmlFile, isHtmlFile } from './ai/useAiHtmlImport'
 import { PresentationToggle } from './present/PresentationToggle'
@@ -30,7 +43,48 @@ const customShapeUtils = [
   AiImageShapeUtil,
   AiVideoShapeUtil,
   AiHtmlShapeUtil,
+  SpreadsheetShapeUtil,
 ]
+
+const customTools = [SpreadsheetShapeTool]
+
+// A monochrome grid glyph for the toolbar. tldraw renders icons via CSS mask,
+// so a black-stroked SVG data URI shows up tinted in the toolbar's accent.
+const SPREADSHEET_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>`
+const SPREADSHEET_ICON = 'spreadsheet-grid'
+
+const assetUrls: TLUiAssetUrlOverrides = {
+  icons: {
+    [SPREADSHEET_ICON]: `data:image/svg+xml;utf8,${encodeURIComponent(SPREADSHEET_ICON_SVG)}`,
+  },
+}
+
+const uiOverrides: TLUiOverrides = {
+  tools(editor, tools) {
+    // No `kbd` shortcut — keeps the canvas key map clean and avoids any future
+    // collision with built-in tldraw bindings; the toolbar button is the entry.
+    tools[SPREADSHEET_TYPE] = {
+      id: SPREADSHEET_TYPE,
+      icon: SPREADSHEET_ICON,
+      label: 'Spreadsheet',
+      onSelect: () => editor.setCurrentTool(SPREADSHEET_TYPE),
+    }
+    return tools
+  },
+}
+
+const components: TLComponents = {
+  Toolbar: (props) => {
+    const tools = useTools()
+    const isSelected = useIsToolSelected(tools[SPREADSHEET_TYPE])
+    return (
+      <DefaultToolbar {...props}>
+        <DefaultToolbarContent />
+        <TldrawUiMenuItem {...tools[SPREADSHEET_TYPE]} isSelected={isSelected} />
+      </DefaultToolbar>
+    )
+  },
+}
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
@@ -228,6 +282,10 @@ export function BoardEditor({ boardId }: Props) {
     >
       <Tldraw
         shapeUtils={customShapeUtils}
+        tools={customTools}
+        overrides={uiOverrides}
+        components={components}
+        assetUrls={assetUrls}
         snapshot={initialSnapshotRef.current ?? undefined}
         onMount={handleMount}
         licenseKey={TLDRAW_LICENSE_KEY || undefined}
