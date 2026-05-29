@@ -63,11 +63,19 @@ function MarkdownComponent({ shape, editor }: { shape: MarkdownShape; editor: Ed
   const [draft, setDraft] = useState(text)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  const [isTitleEditing, setTitleEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(title)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
   // Keep the draft in sync with the persisted text whenever we're not editing
   // (e.g. undo/redo, or another client changing it).
   useEffect(() => {
     if (!isEditing) setDraft(text)
   }, [text, isEditing])
+
+  useEffect(() => {
+    if (!isTitleEditing) setTitleDraft(title)
+  }, [title, isTitleEditing])
 
   // Focus the textarea and drop the caret at the end on entering edit mode.
   useEffect(() => {
@@ -77,6 +85,15 @@ function MarkdownComponent({ shape, editor }: { shape: MarkdownShape; editor: Ed
       el.selectionStart = el.selectionEnd = el.value.length
     }
   }, [isEditing])
+
+  // Focus the title input and select its contents so a rename can be typed
+  // straight over the old value.
+  useEffect(() => {
+    if (isTitleEditing && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isTitleEditing])
 
   const commit = () => {
     if (draft !== text) {
@@ -94,16 +111,39 @@ function MarkdownComponent({ shape, editor }: { shape: MarkdownShape; editor: Ed
     setEditing(false)
   }
 
+  const commitTitle = () => {
+    // Fall back to the existing title when the draft is blank so the header
+    // never renders empty.
+    const next = titleDraft.trim()
+    if (next && next !== title) {
+      updateCustomShape<MarkdownShape>(editor, {
+        id: shape.id,
+        type: MARKDOWN_TYPE,
+        props: { title: next },
+      })
+    } else if (!next) {
+      setTitleDraft(title)
+    }
+    setTitleEditing(false)
+  }
+
+  const cancelTitle = () => {
+    setTitleDraft(title)
+    setTitleEditing(false)
+  }
+
   // Selecting away from the shape while editing should save, not silently drop
-  // the in-flight edit. commit() is idempotent so a blur + deselect double-fire
-  // is harmless.
+  // the in-flight edit. commit()/commitTitle() are idempotent so a blur +
+  // deselect double-fire is harmless.
   const isSelected = useValue(
     'markdown-selected',
     () => editor.getOnlySelectedShapeId() === shape.id,
     [editor, shape.id],
   )
   useEffect(() => {
-    if (!isSelected && isEditing) commit()
+    if (isSelected) return
+    if (isEditing) commit()
+    if (isTitleEditing) commitTitle()
   }, [isSelected])
 
   return (
@@ -113,9 +153,43 @@ function MarkdownComponent({ shape, editor }: { shape: MarkdownShape; editor: Ed
           <span className="inline-flex h-4 items-center rounded-full bg-sky-100 px-1.5 text-[9.5px] font-semibold uppercase tracking-wider text-sky-700">
             MD
           </span>
-          <span className="truncate text-xs font-medium text-neutral-700" title={title}>
-            {title}
-          </span>
+          {isTitleEditing ? (
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              spellCheck={false}
+              onPointerDown={stopEventPropagation}
+              onMouseDown={stopEventPropagation}
+              onDoubleClick={stopEventPropagation}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  cancelTitle()
+                } else if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitTitle()
+                }
+              }}
+              className="min-w-0 flex-1 bg-transparent text-xs font-medium text-neutral-700 outline-none"
+            />
+          ) : (
+            <span
+              className="flex-1 cursor-text truncate text-xs font-medium text-neutral-700"
+              title={title}
+              onPointerDown={stopEventPropagation}
+              onMouseDown={stopEventPropagation}
+              onDoubleClick={(e) => {
+                e.stopPropagation()
+                editor.select(shape.id)
+                setTitleEditing(true)
+              }}
+            >
+              {title}
+            </span>
+          )}
         </header>
 
         {isEditing ? (
@@ -125,6 +199,7 @@ function MarkdownComponent({ shape, editor }: { shape: MarkdownShape; editor: Ed
             spellCheck={false}
             onPointerDown={stopEventPropagation}
             onMouseDown={stopEventPropagation}
+            onDoubleClick={stopEventPropagation}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => {
@@ -142,9 +217,12 @@ function MarkdownComponent({ shape, editor }: { shape: MarkdownShape; editor: Ed
         ) : (
           <div
             className="ai-md flex-1 overflow-auto break-words px-3 py-2 text-[13px] leading-snug text-neutral-800"
+            onPointerDown={stopEventPropagation}
+            onMouseDown={stopEventPropagation}
             onWheel={(e) => e.stopPropagation()}
             onDoubleClick={(e) => {
               e.stopPropagation()
+              editor.select(shape.id)
               setEditing(true)
             }}
           >
