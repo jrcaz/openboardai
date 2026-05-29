@@ -2,6 +2,7 @@ import { AiCardShapeUtil } from './AiCardShapeUtil'
 import { AiHtmlShapeUtil } from './AiHtmlShapeUtil'
 import { AiImageShapeUtil } from './AiImageShapeUtil'
 import { AiVideoShapeUtil } from './AiVideoShapeUtil'
+import { MarkdownShapeUtil } from './MarkdownShapeUtil'
 import { SpreadsheetShapeUtil } from './SpreadsheetShapeUtil'
 
 // The custom tldraw shapes that back AI-generated content. Shared by the board
@@ -11,5 +12,6 @@ export const customShapeUtils = [
   AiImageShapeUtil,
   AiVideoShapeUtil,
   AiHtmlShapeUtil,
+  MarkdownShapeUtil,
   SpreadsheetShapeUtil,
 ]
