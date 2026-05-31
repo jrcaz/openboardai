@@ -206,6 +206,52 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
         }
       },
     }),
+    move_shapes: tool({
+      description:
+        'Move EXISTING shapes already on the canvas by setting their top-left page coordinates. Use this when the user asks to move, arrange, organize, align, cluster, stack, or place existing board items beside each other. Target shapes by their id from the board shape index in the system prompt — never invent ids. Set layout to vertical for stacks/columns, horizontal for rows, or free for independent moves. Leave at least 24px of space between moved shapes and avoid overlapping existing shapes. You may include multiple moves in one call. Continue your text reply after calling the tool, describing what you moved.',
+      inputSchema: z.object({
+        layout: z
+          .enum(['free', 'vertical', 'horizontal'])
+          .default('free')
+          .describe(
+            'How the client should preserve alignment while applying the moves. Use vertical for stacks/columns, horizontal for rows, and free for independent moves.',
+          ),
+        moves: z
+          .array(
+            z.object({
+              targetId: z
+                .string()
+                .describe(
+                  'The id of the EXISTING shape to move, copied verbatim from the board shape index.',
+                ),
+              x: z
+                .number()
+                .min(-1_000_000)
+                .max(1_000_000)
+                .describe('New top-left X coordinate in tldraw page space.'),
+              y: z
+                .number()
+                .min(-1_000_000)
+                .max(1_000_000)
+                .describe('New top-left Y coordinate in tldraw page space.'),
+            }),
+          )
+          .min(1)
+          .max(50)
+          .describe('One or more existing shapes to move.'),
+      }),
+      execute: async ({ layout, moves }) => {
+        // No server-side editor — the movement happens client-side from the
+        // tool-input-available stream event. Validate + acknowledge so the
+        // model gets a tool result and can continue its text reply.
+        return {
+          ok: true as const,
+          layout,
+          count: moves.length,
+          targetIds: moves.map((m) => m.targetId),
+        }
+      },
+    }),
   }
 
   const result = streamText({
