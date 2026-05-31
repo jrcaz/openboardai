@@ -310,6 +310,7 @@ const MCP_TOOLS: { name: string; summary: string }[] = [
   { name: 'list_boards', summary: 'List every board you own, newest first.' },
   { name: 'read_board', summary: 'Read a board’s contents as a flat list of items.' },
   { name: 'add_text_to_board', summary: 'Add a sticky note or text shape at a position.' },
+  { name: 'move_board_items', summary: 'Move existing board items to new positions.' },
   { name: 'generate_on_board', summary: 'Generate text, image, or HTML and drop it on a board. Needs OpenRouter key.' },
 ]
 
@@ -608,6 +609,10 @@ function RestPanel({ restUrl }: { restUrl: string }) {
   -H "content-type: application/json" \\
   -d '{"kind":"note","text":"hello from curl","color":"yellow"}' \\
   ${restUrl}/<board-id>/items`
+  const moveCmd = `curl -X POST -H "Authorization: Bearer YOUR_KEY" \\
+  -H "content-type: application/json" \\
+  -d '{"moves":[{"id":"shape:abc","x":420,"y":180}]}' \\
+  ${restUrl}/<board-id>/items/move`
   return (
     <div className="space-y-3">
       <div>
@@ -621,6 +626,12 @@ function RestPanel({ restUrl }: { restUrl: string }) {
           Add a sticky note
         </div>
         <CodeBlock code={addCmd} />
+      </div>
+      <div>
+        <div className="mb-1 text-[11.5px] font-semibold uppercase tracking-wider text-neutral-500">
+          Move an item
+        </div>
+        <CodeBlock code={moveCmd} />
       </div>
       <Hint>
         For <Mono>POST /boards/:id/generate</Mono>, also send{' '}
