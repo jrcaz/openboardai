@@ -81,7 +81,8 @@ export const AiContextShape = z.object({
   type: z.string(),
   text: z.string().max(4000),
   // Page-space bounds {x,y,w,h}. Lets the model reason about layout/position
-  // and target shapes spatially for annotations. Optional for back-compat.
+  // and target shapes spatially for annotations and movement. Optional for
+  // back-compat.
   bounds: z
     .object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() })
     .optional(),
@@ -107,8 +108,8 @@ export const AiContextShape = z.object({
 export type AiContextShape = z.infer<typeof AiContextShape>
 
 // A lightweight, board-wide index of every shape on the current page so the
-// agent can target ANY shape for annotation (not just the user's selection).
-// Kept minimal to bound token cost.
+// agent can target ANY shape for annotation or movement (not just the user's
+// selection). Kept minimal to bound token cost.
 export const BoardShapeIndexEntry = z.object({
   id: z.string(),
   type: z.string(),
@@ -124,7 +125,8 @@ export const GenerateRequest = z.object({
   context: z
     .object({
       shapes: z.array(AiContextShape).max(20).default([]),
-      // Board-wide shape index for annotation targeting. Capped to bound tokens.
+      // Board-wide shape index for annotation / movement targeting. Capped to
+      // bound tokens.
       boardShapes: z.array(BoardShapeIndexEntry).max(150).optional(),
     })
     .optional(),
@@ -386,6 +388,26 @@ export const AgentAddItemResponse = z.object({
   shapeId: z.string(),
 })
 export type AgentAddItemResponse = z.infer<typeof AgentAddItemResponse>
+
+export const AgentMoveItemsRequest = z.object({
+  moves: z
+    .array(
+      z.object({
+        id: z.string(),
+        x: z.number().min(-1_000_000).max(1_000_000),
+        y: z.number().min(-1_000_000).max(1_000_000),
+      }),
+    )
+    .min(1)
+    .max(50),
+})
+export type AgentMoveItemsRequest = z.infer<typeof AgentMoveItemsRequest>
+
+export const AgentMoveItemsResponse = z.object({
+  movedIds: z.array(z.string()),
+  skippedIds: z.array(z.string()),
+})
+export type AgentMoveItemsResponse = z.infer<typeof AgentMoveItemsResponse>
 
 export const AgentGenerateRequest = z.object({
   kind: z.enum(['text', 'image', 'html']),

@@ -14,12 +14,15 @@ import { dataToCells } from '../shapes/spreadsheet/grid'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
 import {
   type AnnotationSpec,
+  type MoveLayoutHint,
+  type MoveShapeSpec,
   buildBoardShapeIndex,
   createAnnotation,
   createConnectingArrow,
   extractHtmlRef,
   extractImageRef,
   extractShapeText,
+  moveShapes,
   pickAnchor,
 } from './canvas'
 import { clearApiKey, getOpenRouterKey } from '../../settings/useApiKey'
@@ -132,8 +135,9 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       })
 
       // Board-wide index of every shape so the agent can annotate ANY shape,
-      // not just the user's current selection.
-      const boardShapes = buildBoardShapeIndex(editor)
+      // or move ANY shape, not just the user's current selection.
+      const boardShapes = buildBoardShapeIndex(editor).filter((s) => s.id !== (cardId as string))
+      const boardShapeIds = new Set(boardShapes.map((s) => s.id))
 
       // Track the shape created for each tool call (and its kind) so we can
       // update the right shape when the tool's output arrives.
@@ -304,6 +308,27 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
                 },
                 { history: 'ignore' },
               )
+            }
+            continue
+          }
+
+          if (
+            chunk.type === 'tool-input-available' &&
+            chunk.toolName === 'move_shapes' &&
+            chunk.toolCallId
+          ) {
+            const input = chunk.input as { layout?: MoveLayoutHint; moves?: MoveShapeSpec[] }
+            const moves = Array.isArray(input.moves) ? input.moves : []
+            if (moves.length > 0) {
+              editor.run(() => {
+                moveShapes(
+                  editor,
+                  moves,
+                  boardShapeIds,
+                  new Set([cardId as string]),
+                  input.layout,
+                )
+              })
             }
             continue
           }

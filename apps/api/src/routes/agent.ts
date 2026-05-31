@@ -3,13 +3,16 @@ import { zValidator } from '@hono/zod-validator'
 import {
   AgentAddItemRequest,
   AgentGenerateRequest,
+  AgentMoveItemsRequest,
   type AgentBoardContent,
   type AgentBoardSummary,
+  type AgentMoveItemsResponse,
 } from '@openboard-ai/shared'
 import {
   addTextToBoard,
   generateOnBoard,
   listBoards,
+  moveItemsOnBoard,
   readBoard,
 } from '../lib/agent-actions.js'
 import type { AuthEnv } from '../middleware/auth.js'
@@ -41,6 +44,19 @@ agent.post(
     const result = await addTextToBoard(user.id, id, body)
     if (!result) return c.json({ error: 'not_found' }, 404)
     return c.json(result, 201)
+  },
+)
+
+agent.post(
+  '/boards/:id/items/move',
+  zValidator('json', AgentMoveItemsRequest),
+  async (c) => {
+    const user = c.get('user')!
+    const id = c.req.param('id')
+    const body = c.req.valid('json')
+    const result = await moveItemsOnBoard(user.id, id, body)
+    if (!result) return c.json({ error: 'not_found' }, 404)
+    return c.json(result satisfies AgentMoveItemsResponse)
   },
 )
 

@@ -234,6 +234,348 @@ export type AnnotationSpec = {
   color?: string
 }
 
+export type MoveShapeSpec = {
+  targetId: string
+  x: number
+  y: number
+}
+
+export type MoveLayoutHint = 'free' | 'vertical' | 'horizontal'
+
+export function moveShapes(
+  editor: Editor,
+  moves: MoveShapeSpec[],
+  allowedIds: ReadonlySet<string>,
+  ignoredIds: ReadonlySet<string> = new Set(),
+  layoutHint: MoveLayoutHint = 'free',
+): string[] {
+  const currentPageIds = editor.getCurrentPageShapeIds()
+  const moveIds = new Set(
+    moves.map((m) => m?.targetId).filter((id): id is string => typeof id === 'string'),
+  )
+  const occupied = buildOccupiedRects(editor, currentPageIds, moveIds, ignoredIds)
+  const safeViewport = getSafeViewportRect(editor)
+  const plans = collectMovePlans(editor, moves, allowedIds, currentPageIds)
+  const layout = layoutHint === 'free' ? inferMoveLayout(plans) : layoutHint
+
+  if (layout === 'vertical' || layout === 'horizontal') {
+    return applyAlignedMoves(editor, plans, layout, occupied, safeViewport)
+  }
+
+  const moved: string[] = []
+  for (const plan of plans) {
+    const { desired, id, shape } = plan
+    const resolved = findNearestOpenRect(desired, occupied, safeViewport)
+
+    ;(editor.updateShape as (shape: unknown) => void).call(editor, {
+      id,
+      type: shape.type,
+      x: resolved.x,
+      y: resolved.y,
+    })
+    occupied.push(resolved)
+    moved.push(id as string)
+  }
+
+  return moved
+}
+
+type PageRect = { x: number; y: number; w: number; h: number }
+type MovePlan = { id: TLShapeId; shape: TLShape; desired: PageRect }
+
+const MOVE_COLLISION_PAD = 24
+const MOVE_COLLISION_SCAN_RADIUS = 10
+const MOVE_VIEWPORT_MARGIN_PX = 32
+const MOVE_TOP_CHROME_PX = 72
+const MOVE_BOTTOM_CHROME_PX = 220
+
+function collectMovePlans(
+  editor: Editor,
+  moves: MoveShapeSpec[],
+  allowedIds: ReadonlySet<string>,
+  currentPageIds: ReadonlySet<TLShapeId>,
+): MovePlan[] {
+  const out: MovePlan[] = []
+  for (const move of moves) {
+    if (!move || typeof move.targetId !== 'string') continue
+    if (!allowedIds.has(move.targetId)) continue
+    if (!Number.isFinite(move.x) || !Number.isFinite(move.y)) continue
+
+    const id = move.targetId as TLShapeId
+    if (!currentPageIds.has(id)) continue
+    const shape = editor.getShape(id)
+    if (!shape || shape.isLocked) continue
+    const bounds = editor.getShapePageBounds(id)
+    if (!bounds) continue
+
+    out.push({
+      id,
+      shape,
+      desired: { x: move.x, y: move.y, w: bounds.width, h: bounds.height },
+    })
+  }
+  return out
+}
+
+function inferMoveLayout(plans: MovePlan[]): MoveLayoutHint {
+  if (plans.length < 2) return 'free'
+  const xs = plans.map((p) => p.desired.x)
+  const ys = plans.map((p) => p.desired.y)
+  const spreadX = Math.max(...xs) - Math.min(...xs)
+  const spreadY = Math.max(...ys) - Math.min(...ys)
+  const avgW = plans.reduce((sum, p) => sum + p.desired.w, 0) / plans.length
+  const avgH = plans.reduce((sum, p) => sum + p.desired.h, 0) / plans.length
+
+  if (spreadY > avgH * 0.4 && spreadX <= avgW * 0.75) return 'vertical'
+  if (spreadX > avgW * 0.4 && spreadY <= avgH * 0.75) return 'horizontal'
+  if (spreadY > spreadX * 1.4) return 'vertical'
+  if (spreadX > spreadY * 1.4) return 'horizontal'
+  return 'free'
+}
+
+function applyAlignedMoves(
+  editor: Editor,
+  plans: MovePlan[],
+  layout: Exclude<MoveLayoutHint, 'free'>,
+  occupied: PageRect[],
+  safeViewport: PageRect | null,
+): string[] {
+  const moved: string[] = []
+  const vertical = layout === 'vertical'
+  const sorted = [...plans].sort((a, b) =>
+    vertical ? a.desired.y - b.desired.y : a.desired.x - b.desired.x,
+  )
+  if (sorted.length === 0) return moved
+
+  const crossValues = sorted.map((p) => (vertical ? p.desired.x : p.desired.y))
+  let cross = median(crossValues)
+  let cursor = Math.min(...sorted.map((p) => (vertical ? p.desired.y : p.desired.x)))
+  const maxCrossSize = Math.max(...sorted.map((p) => (vertical ? p.desired.w : p.desired.h)))
+  const totalPrimarySize =
+    sorted.reduce((sum, p) => sum + (vertical ? p.desired.h : p.desired.w), 0) +
+    MOVE_COLLISION_PAD * (sorted.length - 1)
+
+  if (safeViewport) {
+    if (vertical) {
+      if (maxCrossSize <= safeViewport.w) {
+        cross = clamp(cross, safeViewport.x, safeViewport.x + safeViewport.w - maxCrossSize)
+      }
+      if (totalPrimarySize <= safeViewport.h) {
+        cursor = clamp(cursor, safeViewport.y, safeViewport.y + safeViewport.h - totalPrimarySize)
+      } else if (cursor > safeViewport.y) {
+        cursor = safeViewport.y
+      }
+    } else {
+      if (maxCrossSize <= safeViewport.h) {
+        cross = clamp(cross, safeViewport.y, safeViewport.y + safeViewport.h - maxCrossSize)
+      }
+      if (totalPrimarySize <= safeViewport.w) {
+        cursor = clamp(cursor, safeViewport.x, safeViewport.x + safeViewport.w - totalPrimarySize)
+      } else if (cursor > safeViewport.x) {
+        cursor = safeViewport.x
+      }
+    }
+  }
+
+  for (const plan of sorted) {
+    const aligned = vertical
+      ? { ...plan.desired, x: cross, y: cursor }
+      : { ...plan.desired, x: cursor, y: cross }
+    const resolved = findOpenOnAxis(aligned, occupied, layout, safeViewport)
+
+    ;(editor.updateShape as (shape: unknown) => void).call(editor, {
+      id: plan.id,
+      type: plan.shape.type,
+      x: resolved.x,
+      y: resolved.y,
+    })
+    occupied.push(resolved)
+    moved.push(plan.id as string)
+    cursor =
+      (vertical ? resolved.y + resolved.h : resolved.x + resolved.w) + MOVE_COLLISION_PAD
+  }
+
+  return moved
+}
+
+function buildOccupiedRects(
+  editor: Editor,
+  pageShapeIds: ReadonlySet<TLShapeId>,
+  moveIds: ReadonlySet<string>,
+  ignoredIds: ReadonlySet<string>,
+): PageRect[] {
+  const out: PageRect[] = []
+  for (const id of pageShapeIds) {
+    const sid = id as string
+    if (moveIds.has(sid) || ignoredIds.has(sid)) continue
+    const shape = editor.getShape(id)
+    if (!shape || shape.type === 'arrow' || shape.type === 'highlight') continue
+    const b = editor.getShapePageBounds(id)
+    if (!b) continue
+    out.push({ x: b.minX, y: b.minY, w: b.width, h: b.height })
+  }
+  return out
+}
+
+function getSafeViewportRect(editor: Editor): PageRect | null {
+  const vp = editor.getViewportPageBounds()
+  const zoom = Math.max(0.05, editor.getZoomLevel())
+  const margin = MOVE_VIEWPORT_MARGIN_PX / zoom
+  const top = MOVE_TOP_CHROME_PX / zoom
+  const bottom = MOVE_BOTTOM_CHROME_PX / zoom
+  const safe = {
+    x: vp.minX + margin,
+    y: vp.minY + top,
+    w: Math.max(0, vp.width - margin * 2),
+    h: Math.max(0, vp.height - top - bottom),
+  }
+  return safe.w > 80 && safe.h > 80 ? safe : null
+}
+
+function findOpenOnAxis(
+  desired: PageRect,
+  occupied: PageRect[],
+  axis: Exclude<MoveLayoutHint, 'free'>,
+  safeViewport: PageRect | null,
+): PageRect {
+  const preferred = safeViewport ? clampRectToViewport(desired, safeViewport) : desired
+  if (!rectOverlapsAny(preferred, occupied)) return preferred
+
+  const vertical = axis === 'vertical'
+  const candidates: PageRect[] = []
+  const addCandidate = (candidate: PageRect) => {
+    candidates.push(safeViewport ? clampRectToViewport(candidate, safeViewport) : candidate)
+  }
+  addCandidate(preferred)
+  for (const other of occupied) {
+    if (vertical && !rangesOverlap(preferred.x, preferred.w, other.x, other.w, MOVE_COLLISION_PAD)) {
+      continue
+    }
+    if (!vertical && !rangesOverlap(preferred.y, preferred.h, other.y, other.h, MOVE_COLLISION_PAD)) {
+      continue
+    }
+    addCandidate(
+      vertical
+        ? { ...preferred, y: other.y + other.h + MOVE_COLLISION_PAD }
+        : { ...preferred, x: other.x + other.w + MOVE_COLLISION_PAD },
+    )
+    addCandidate(
+      vertical
+        ? { ...preferred, y: other.y - preferred.h - MOVE_COLLISION_PAD }
+        : { ...preferred, x: other.x - preferred.w - MOVE_COLLISION_PAD },
+    )
+  }
+
+  const step = vertical
+    ? Math.max(80, Math.min(240, preferred.h + MOVE_COLLISION_PAD))
+    : Math.max(80, Math.min(320, preferred.w + MOVE_COLLISION_PAD))
+  for (let radius = 1; radius <= MOVE_COLLISION_SCAN_RADIUS; radius++) {
+    addCandidate(
+      vertical
+        ? { ...preferred, y: preferred.y + radius * step }
+        : { ...preferred, x: preferred.x + radius * step },
+    )
+    addCandidate(
+      vertical
+        ? { ...preferred, y: preferred.y - radius * step }
+        : { ...preferred, x: preferred.x - radius * step },
+    )
+  }
+
+  let best: PageRect | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+  for (const candidate of candidates) {
+    if (rectOverlapsAny(candidate, occupied)) continue
+    const score = vertical ? (candidate.y - preferred.y) ** 2 : (candidate.x - preferred.x) ** 2
+    if (score < bestScore) {
+      best = candidate
+      bestScore = score
+    }
+  }
+
+  return best ?? preferred
+}
+
+function findNearestOpenRect(
+  desired: PageRect,
+  occupied: PageRect[],
+  safeViewport: PageRect | null,
+): PageRect {
+  const preferred = safeViewport ? clampRectToViewport(desired, safeViewport) : desired
+  if (!rectOverlapsAny(preferred, occupied)) return preferred
+
+  const candidates: PageRect[] = []
+  const addCandidate = (candidate: PageRect) => {
+    candidates.push(safeViewport ? clampRectToViewport(candidate, safeViewport) : candidate)
+  }
+  addCandidate(preferred)
+  for (const other of occupied) {
+    addCandidate({ ...preferred, x: other.x + other.w + MOVE_COLLISION_PAD })
+    addCandidate({ ...preferred, x: other.x - preferred.w - MOVE_COLLISION_PAD })
+    addCandidate({ ...preferred, y: other.y + other.h + MOVE_COLLISION_PAD })
+    addCandidate({ ...preferred, y: other.y - preferred.h - MOVE_COLLISION_PAD })
+  }
+
+  const stepX = Math.max(80, Math.min(320, preferred.w + MOVE_COLLISION_PAD))
+  const stepY = Math.max(80, Math.min(240, preferred.h + MOVE_COLLISION_PAD))
+  for (let radius = 1; radius <= MOVE_COLLISION_SCAN_RADIUS; radius++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
+        addCandidate({ ...preferred, x: preferred.x + dx * stepX, y: preferred.y + dy * stepY })
+      }
+    }
+  }
+
+  let best: PageRect | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+  for (const candidate of candidates) {
+    if (rectOverlapsAny(candidate, occupied)) continue
+    const score = (candidate.x - desired.x) ** 2 + (candidate.y - desired.y) ** 2
+    if (score < bestScore) {
+      best = candidate
+      bestScore = score
+    }
+  }
+
+  return best ?? preferred
+}
+
+function clampRectToViewport(rect: PageRect, viewport: PageRect): PageRect {
+  return {
+    ...rect,
+    x: clamp(rect.x, viewport.x, Math.max(viewport.x, viewport.x + viewport.w - rect.w)),
+    y: clamp(rect.y, viewport.y, Math.max(viewport.y, viewport.y + viewport.h - rect.h)),
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
+}
+
+function rectOverlapsAny(rect: PageRect, others: PageRect[]): boolean {
+  return others.some((other) => rectsOverlap(rect, other, MOVE_COLLISION_PAD))
+}
+
+function rangesOverlap(aStart: number, aSize: number, bStart: number, bSize: number, pad: number): boolean {
+  return aStart < bStart + bSize + pad && aStart + aSize + pad > bStart
+}
+
+function rectsOverlap(a: PageRect, b: PageRect, pad: number): boolean {
+  return (
+    a.x < b.x + b.w + pad &&
+    a.x + a.w + pad > b.x &&
+    a.y < b.y + b.h + pad &&
+    a.y + a.h + pad > b.y
+  )
+}
+
 const ANNOTATION_PAD = 16
 const CALLOUT_W = 200
 const ARROW_OFFSET = 80

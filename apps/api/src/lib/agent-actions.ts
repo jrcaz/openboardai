@@ -103,6 +103,35 @@ export async function addTextToBoard(
   return { shapeId: result.shapeIds[0]! }
 }
 
+export interface MoveItemsResult {
+  movedIds: string[]
+  skippedIds: string[]
+}
+
+export async function moveItemsOnBoard(
+  userId: string,
+  boardId: string,
+  opts: { moves: { id: string; x: number; y: number }[] },
+): Promise<MoveItemsResult | null> {
+  const movedIds: string[] = []
+  const skippedIds: string[] = []
+  const result = await mergeAndPersist(boardId, userId, (parsed) => {
+    for (const move of opts.moves) {
+      const rec = parsed.store[move.id]
+      if (!rec || rec.typeName !== 'shape' || rec.isLocked === true) {
+        skippedIds.push(move.id)
+        continue
+      }
+      rec.x = move.x
+      rec.y = move.y
+      movedIds.push(move.id)
+    }
+    return []
+  })
+  if (!result) return null
+  return { movedIds, skippedIds }
+}
+
 export type AgentGenerateKind = 'text' | 'image' | 'html'
 
 export interface GenerateOnBoardResult {

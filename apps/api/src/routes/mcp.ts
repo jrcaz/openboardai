@@ -6,6 +6,7 @@ import {
   addTextToBoard,
   generateOnBoard,
   listBoards,
+  moveItemsOnBoard,
   readBoard,
 } from '../lib/agent-actions.js'
 import type { AuthEnv } from '../middleware/auth.js'
@@ -114,6 +115,49 @@ function buildServer(userId: string, openRouterKey: string | null) {
       }
       return {
         content: [{ type: 'text', text: `Added shape ${result.shapeId} to board ${boardId}.` }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'move_board_items',
+    {
+      title: 'Move existing board items',
+      description:
+        'Move one or more existing shapes on a board by setting their top-left tldraw page coordinates. Use read_board first to get item ids and positions. This only moves existing items; it does not create or edit their content.',
+      inputSchema: {
+        boardId: z.string().describe('The id of the board to update.'),
+        moves: z
+          .array(
+            z.object({
+              id: z.string().describe('The existing shape id to move.'),
+              x: z
+                .number()
+                .min(-1_000_000)
+                .max(1_000_000)
+                .describe('New top-left X coordinate in tldraw page space.'),
+              y: z
+                .number()
+                .min(-1_000_000)
+                .max(1_000_000)
+                .describe('New top-left Y coordinate in tldraw page space.'),
+            }),
+          )
+          .min(1)
+          .max(50)
+          .describe('The shape position updates to apply.'),
+      },
+    },
+    async ({ boardId, moves }) => {
+      const result = await moveItemsOnBoard(userId, boardId, { moves })
+      if (!result) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Board not found: ${boardId}` }],
+        }
+      }
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       }
     },
   )
