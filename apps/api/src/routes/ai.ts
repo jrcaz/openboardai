@@ -35,6 +35,24 @@ import { userOwnsBoard } from '../lib/ownership.js'
 
 export const ai = new Hono<AuthEnv>()
 
+// tldraw's default color palette — the valid `color` values for native
+// arrow/geo/text annotation shapes.
+const ANNOTATE_COLORS = [
+  'black',
+  'grey',
+  'light-violet',
+  'violet',
+  'blue',
+  'light-blue',
+  'yellow',
+  'orange',
+  'green',
+  'light-green',
+  'light-red',
+  'red',
+  'white',
+] as const
+
 function requireOpenRouter(c: Context) {
   const key = c.req.header('x-openrouter-key')?.trim()
   if (!key) {
@@ -142,6 +160,97 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
         url: z.string().url().describe('Absolute http(s) URL to fetch.'),
       }),
       execute: async ({ url }) => fetchUrlForModel(url),
+    }),
+    annotate: tool({
+      description:
+        'Mark up EXISTING shapes already on the canvas: point at them with arrows, draw an outline box/ellipse around them, add a text callout near them, or highlight them. Use this whenever the user asks to point out, mark, highlight, circle, box, label, or annotate something already on the board. Target shapes by their id from the board shape index in the system prompt — never invent ids. You may include multiple annotations in one call. Continue your text reply after calling the tool, describing what you marked.',
+      inputSchema: z.object({
+        annotations: z
+          .array(
+            z.object({
+              kind: z
+                .enum(['arrow', 'box', 'ellipse', 'callout', 'highlight'])
+                .describe(
+                  'arrow=point at the shape; box/ellipse=outline around it; callout=text note near it; highlight=highlighter stroke over it.',
+                ),
+              targetId: z
+                .string()
+                .describe(
+                  'The id of the EXISTING shape to annotate, copied verbatim from the board shape index.',
+                ),
+              label: z
+                .string()
+                .max(120)
+                .optional()
+                .describe(
+                  'Short text. Required for "callout"; optional caption for "arrow". Ignored for box/ellipse/highlight.',
+                ),
+              color: z
+                .enum(ANNOTATE_COLORS)
+                .default('red')
+                .describe('Annotation color. Defaults to red for visibility.'),
+            }),
+          )
+          .min(1)
+          .max(12)
+          .describe('One or more annotations to draw on existing shapes.'),
+      }),
+      execute: async ({ annotations }) => {
+        // No server-side editor — the drawing happens client-side from the
+        // tool-input-available stream event. Validate + acknowledge so the
+        // model gets a tool result and can continue its text reply.
+        return {
+          ok: true as const,
+          count: annotations.length,
+          kinds: annotations.map((a) => a.kind),
+        }
+      },
+    }),
+    move_shapes: tool({
+      description:
+        'Move EXISTING shapes already on the canvas by setting their top-left page coordinates. Use this when the user asks to move, arrange, organize, align, cluster, stack, or place existing board items beside each other. Target shapes by their id from the board shape index in the system prompt — never invent ids. Set layout to vertical for stacks/columns, horizontal for rows, or free for independent moves. Leave at least 24px of space between moved shapes and avoid overlapping existing shapes. You may include multiple moves in one call. Continue your text reply after calling the tool, describing what you moved.',
+      inputSchema: z.object({
+        layout: z
+          .enum(['free', 'vertical', 'horizontal'])
+          .default('free')
+          .describe(
+            'How the client should preserve alignment while applying the moves. Use vertical for stacks/columns, horizontal for rows, and free for independent moves.',
+          ),
+        moves: z
+          .array(
+            z.object({
+              targetId: z
+                .string()
+                .describe(
+                  'The id of the EXISTING shape to move, copied verbatim from the board shape index.',
+                ),
+              x: z
+                .number()
+                .min(-1_000_000)
+                .max(1_000_000)
+                .describe('New top-left X coordinate in tldraw page space.'),
+              y: z
+                .number()
+                .min(-1_000_000)
+                .max(1_000_000)
+                .describe('New top-left Y coordinate in tldraw page space.'),
+            }),
+          )
+          .min(1)
+          .max(50)
+          .describe('One or more existing shapes to move.'),
+      }),
+      execute: async ({ layout, moves }) => {
+        // No server-side editor — the movement happens client-side from the
+        // tool-input-available stream event. Validate + acknowledge so the
+        // model gets a tool result and can continue its text reply.
+        return {
+          ok: true as const,
+          layout,
+          count: moves.length,
+          targetIds: moves.map((m) => m.targetId),
+        }
+      },
     }),
   }
 
