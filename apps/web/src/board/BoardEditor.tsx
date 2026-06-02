@@ -36,6 +36,10 @@ import { FileMenu } from './FileMenu'
 import { BoardLoading } from './BoardLoading'
 import { ShareButton } from './ShareButton'
 import { ProjectsSidebar } from './ProjectsSidebar'
+import { hashBoardId, track } from '../analytics/posthog'
+import { countShapeTypes, snapshotSizeKb } from '../analytics/events'
+
+const ACTIVE_HEARTBEAT_MS = 60_000
 
 const customTools = [SpreadsheetShapeTool]
 
@@ -58,7 +62,10 @@ const uiOverrides: TLUiOverrides = {
       id: SPREADSHEET_TYPE,
       icon: SPREADSHEET_ICON,
       label: 'Spreadsheet',
-      onSelect: () => editor.setCurrentTool(SPREADSHEET_TYPE),
+      onSelect: () => {
+        track('spreadsheet_tool_selected')
+        editor.setCurrentTool(SPREADSHEET_TYPE)
+      },
     }
     return tools
   },
@@ -99,7 +106,7 @@ interface Props {
 
 export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
-  const [isPresenting, setIsPresenting] = useState(false)
+  const [isPresenting, setIsPresentingState] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   // Set when the board 404s but is an ownerless legacy board the user can claim.
   const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
@@ -118,6 +125,15 @@ export function BoardEditor({ boardId }: Props) {
   const loadedRef = useRef(false)
   const saveTimerRef = useRef<number | null>(null)
   const lastSavedRef = useRef<string>('')
+  const openedAtRef = useRef<number>(Date.now())
+  const lastHeartbeatRef = useRef<number>(0)
+
+  const setIsPresenting = useCallback((next: boolean) => {
+    setIsPresentingState((prev) => {
+      if (prev !== next) track('presentation_mode_toggled', { enabled: next })
+      return next
+    })
+  }, [])
 
   // Pre-fetch the snapshot before <Tldraw> mounts so we can pass it via prop —
   // avoids a flicker where empty store is rendered then replaced.
@@ -125,15 +141,29 @@ export function BoardEditor({ boardId }: Props) {
     let cancelled = false
     setLoadError(null)
     setClaimable(null)
+    openedAtRef.current = Date.now()
+    lastHeartbeatRef.current = 0
+    loadedRef.current = false
+    lastSavedRef.current = ''
     api
       .getBoard(boardId)
       .then((board) => {
         if (cancelled) return
         if (board.snapshot && Object.keys(board.snapshot).length > 0) {
           initialSnapshotRef.current = board.snapshot as unknown as TLStoreSnapshot
+        } else {
+          initialSnapshotRef.current = null
         }
         setShare({ isPublic: board.isPublic, shareToken: board.shareToken })
         loadedRef.current = true
+        const snap = initialSnapshotRef.current
+        const { total, byType } = countShapeTypes(snap)
+        track('board_opened', {
+          board_id_hash: hashBoardId(boardId),
+          shape_count: total,
+          shape_type_counts: byType,
+          snapshot_size_kb: snap ? snapshotSizeKb(snap) : 0,
+        })
         // Force a render to mount <Tldraw> with the snapshot prop.
         setEditor((e) => e)
         forceMount()
@@ -201,7 +231,7 @@ export function BoardEditor({ boardId }: Props) {
           await importHtmlFile(ed, f, { boardId, point: info.point })
         }
         for (const f of markdownFiles) {
-          await importMarkdownFile(ed, f, { point: info.point })
+          await importMarkdownFile(ed, f, { boardId, point: info.point })
         }
         if (otherFiles.length > 0 && defaultFiles) {
           await defaultFiles({ ...info, files: otherFiles } as unknown)
@@ -217,6 +247,17 @@ export function BoardEditor({ boardId }: Props) {
             if (serialized === lastSavedRef.current) return
             await api.saveSnapshot(boardId, snap as unknown as Record<string, unknown>)
             lastSavedRef.current = serialized
+            const now = Date.now()
+            if (now - lastHeartbeatRef.current >= ACTIVE_HEARTBEAT_MS) {
+              lastHeartbeatRef.current = now
+              const { total, byType } = countShapeTypes(snap as unknown as Record<string, unknown>)
+              track('board_active', {
+                board_id_hash: hashBoardId(boardId),
+                shape_count: total,
+                shape_type_counts: byType,
+                time_since_open_s: Math.round((now - openedAtRef.current) / 1000),
+              })
+            }
           } catch (err) {
             console.error('[board] save failed', err)
           }
@@ -267,9 +308,20 @@ export function BoardEditor({ boardId }: Props) {
         const board = await api.setBoardPublic(requestedFor, next)
         if (currentBoardIdRef.current !== requestedFor) return
         setShare({ isPublic: board.isPublic, shareToken: board.shareToken })
+        track('board_share_toggled', {
+          board_id_hash: hashBoardId(requestedFor),
+          is_public: board.isPublic,
+          requested_public: next,
+          status: 'success',
+        })
       } catch (err) {
         if (currentBoardIdRef.current !== requestedFor) return
         console.error('[share] toggle failed', err)
+        track('board_share_toggled', {
+          board_id_hash: hashBoardId(requestedFor),
+          requested_public: next,
+          status: 'error',
+        })
         setShareError(friendlyShareError(err, 'Could not update sharing.'))
       } finally {
         if (currentBoardIdRef.current === requestedFor) setShareBusy(false)
@@ -286,9 +338,18 @@ export function BoardEditor({ boardId }: Props) {
       const next = await api.regenerateShareToken(requestedFor)
       if (currentBoardIdRef.current !== requestedFor) return
       setShare({ isPublic: next.isPublic, shareToken: next.shareToken })
+      track('board_share_regenerated', {
+        board_id_hash: hashBoardId(requestedFor),
+        is_public: next.isPublic,
+        status: 'success',
+      })
     } catch (err) {
       if (currentBoardIdRef.current !== requestedFor) return
       console.error('[share] regenerate failed', err)
+      track('board_share_regenerated', {
+        board_id_hash: hashBoardId(requestedFor),
+        status: 'error',
+      })
       setShareError(friendlyShareError(err, 'Could not generate a new link.'))
     } finally {
       if (currentBoardIdRef.current === requestedFor) setShareBusy(false)
@@ -305,6 +366,7 @@ export function BoardEditor({ boardId }: Props) {
         boardId={boardId}
         title={claimable.title}
         onClaimed={() => {
+          track('board_claimed', { board_id_hash: hashBoardId(boardId) })
           setClaimable(null)
           setReloadNonce((n) => n + 1)
         }}
@@ -364,6 +426,18 @@ export function BoardEditor({ boardId }: Props) {
           error={shareError}
           onToggle={handleShareToggle}
           onRegenerate={handleShareRegenerate}
+          onCopy={() =>
+            track('board_share_link_copied', {
+              board_id_hash: hashBoardId(boardId),
+            })
+          }
+          onOpenChange={(open) =>
+            open &&
+            track('board_share_popover_opened', {
+              board_id_hash: hashBoardId(boardId),
+              is_public: share.isPublic,
+            })
+          }
           onDismissError={() => setShareError(null)}
         />
         <FileMenu editor={editor} boardId={boardId} />
@@ -391,4 +465,3 @@ export function BoardEditor({ boardId }: Props) {
     </div>
   )
 }
-

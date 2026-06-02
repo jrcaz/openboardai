@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ApiKeySummary, CreatedApiKey } from '@openboard-ai/shared'
 import { api } from '../lib/api'
 import { relativeTime } from '../lib/relativeTime'
+import { hashValue, track } from '../analytics/posthog'
 
 function lastUsedLabel(iso: string | null): string {
   return iso ? `last used ${relativeTime(iso)}` : 'never used'
@@ -26,8 +27,10 @@ export function AgentKeysSection() {
     try {
       const rows = await api.listApiKeys()
       setKeys(rows)
+      track('agent_keys_loaded', { key_count: rows.length, status: 'success' })
     } catch (err) {
       setLoadError((err as Error).message)
+      track('agent_keys_loaded', { status: 'error' })
     }
   }, [])
 
@@ -55,8 +58,10 @@ export function AgentKeysSection() {
       setName('')
       setCopied(false)
       await refresh()
+      track('agent_key_created', { key_id_hash: hashValue(created.id), status: 'success' })
     } catch (err) {
       setCreateError((err as Error).message)
+      track('agent_key_created', { status: 'error' })
     } finally {
       setCreating(false)
     }
@@ -69,8 +74,10 @@ export function AgentKeysSection() {
       await api.revokeApiKey(id)
       setConfirmRevokeId(null)
       await refresh()
+      track('agent_key_revoked', { key_id_hash: hashValue(id), status: 'success' })
     } catch (err) {
       setRevokeError({ id, message: (err as Error).message })
+      track('agent_key_revoked', { key_id_hash: hashValue(id), status: 'error' })
     } finally {
       setRevokingId(null)
     }
@@ -79,6 +86,7 @@ export function AgentKeysSection() {
   function copyPlaintext(text: string) {
     void navigator.clipboard.writeText(text).catch(() => {})
     setCopied(true)
+    track('agent_key_copied')
     window.setTimeout(() => setCopied(false), 1500)
   }
 
@@ -330,6 +338,7 @@ function ConnectGuide({ origin }: { origin: string }) {
     if (next) {
       e.preventDefault()
       setTab(next)
+      track('agent_connect_tab_selected', { tab: next, source: 'keyboard' })
       tabRefs.current[next]?.focus()
     }
   }
@@ -370,7 +379,10 @@ function ConnectGuide({ origin }: { origin: string }) {
                 aria-selected={isActive}
                 aria-controls="connect-tab-panel"
                 tabIndex={isActive ? 0 : -1}
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  setTab(t.id)
+                  track('agent_connect_tab_selected', { tab: t.id, source: 'click' })
+                }}
                 className={[
                   'relative -mb-px shrink-0 rounded-t-md border-b-[2px] px-3 py-2 text-[12.5px] font-medium transition',
                   isActive

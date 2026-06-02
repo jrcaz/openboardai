@@ -25,6 +25,8 @@ import {
   getModelPreference,
   looksLikeBadModelError,
 } from '../../settings/useModelPreferences'
+import { hashBoardId, track } from '../../analytics/posthog'
+import { bucketPromptLength, categorizeError } from '../../analytics/events'
 
 export type GenerateMode = GenerateRequest['mode']
 
@@ -133,8 +135,12 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
         { id: TLShapeId; kind: 'html' | 'spreadsheet' }
       >()
 
+      const startedAt = Date.now()
+      const contextShapeTypes = Array.from(new Set(ctx.map((c) => c.type)))
+      const hasImageContext = ctx.some((c) => !!c.imageRef)
+      const modelPref = getModelPreference('text')
+
       try {
-        const modelPref = getModelPreference('text')
         const res = await fetch('/api/ai/generate', {
           method: 'POST',
           headers: {
@@ -351,6 +357,18 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
           { history: 'ignore' },
         )
 
+        track('ai_text_generated', {
+          board_id_hash: hashBoardId(boardId),
+          model: modelPref ?? 'default',
+          mode,
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          context_shape_count: ctx.length,
+          context_shape_types: contextShapeTypes,
+          has_image_context: hasImageContext,
+          duration_ms: Date.now() - startedAt,
+          status: 'success',
+        })
+
         return { cardId, text: acc }
       } catch (err) {
         console.error('[ai] generate failed', err)
@@ -368,6 +386,18 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
           },
           { history: 'ignore' },
         )
+        track('ai_text_generated', {
+          board_id_hash: hashBoardId(boardId),
+          model: modelPref ?? 'default',
+          mode,
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          context_shape_count: ctx.length,
+          context_shape_types: contextShapeTypes,
+          has_image_context: hasImageContext,
+          duration_ms: Date.now() - startedAt,
+          status: 'error',
+          error_category: categorizeError(message),
+        })
         return undefined
       } finally {
         inFlight.current.delete(cardId)

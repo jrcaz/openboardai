@@ -16,6 +16,7 @@
     "better-auth": "^1.2.12",
     "fflate": "^0.8.3",
     "nanoid": "^5.1.11",
+    "posthog-js": "^1.252.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",

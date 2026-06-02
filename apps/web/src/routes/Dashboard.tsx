@@ -7,6 +7,7 @@ import { relativeTime } from '../lib/relativeTime'
 import { downloadBlob } from '../board/io/obx'
 import { BrandMark } from './landing/BrandMark'
 import { UserMenu } from '../components/UserMenu'
+import { hashBoardId, track } from '../analytics/posthog'
 
 type LoadState =
   | { kind: 'loading' }
@@ -25,8 +26,10 @@ export function Dashboard() {
     try {
       const boards = await api.listBoards()
       setState({ kind: 'ready', boards })
+      track('dashboard_loaded', { board_count: boards.length, status: 'success' })
     } catch (err) {
       setState({ kind: 'error', message: (err as Error).message })
+      track('dashboard_loaded', { status: 'error' })
     }
   }, [])
 
@@ -39,9 +42,14 @@ export function Dashboard() {
     setCreating(true)
     try {
       const board = await api.createBoard()
+      track('board_created', {
+        source: 'dashboard',
+        board_id_hash: hashBoardId(board.id),
+      })
       setLocation(`/b/${board.id}`)
     } catch (err) {
       setCreating(false)
+      track('board_created', { source: 'dashboard', status: 'error' })
       alert('Failed to create board: ' + (err as Error).message)
     }
   }, [creating, setLocation])
@@ -59,7 +67,13 @@ export function Dashboard() {
       )
       try {
         await api.renameBoard(board.id, trimmed)
+        track('board_renamed', { board_id_hash: hashBoardId(board.id), source: 'dashboard' })
       } catch (err) {
+        track('board_renamed', {
+          board_id_hash: hashBoardId(board.id),
+          source: 'dashboard',
+          status: 'error',
+        })
         alert('Rename failed: ' + (err as Error).message)
         void load()
       }
@@ -75,7 +89,13 @@ export function Dashboard() {
     )
     try {
       await api.deleteBoard(board.id)
+      track('board_deleted', { board_id_hash: hashBoardId(board.id), source: 'dashboard' })
     } catch (err) {
+      track('board_deleted', {
+        board_id_hash: hashBoardId(board.id),
+        source: 'dashboard',
+        status: 'error',
+      })
       alert('Delete failed: ' + (err as Error).message)
       setState((s) =>
         s.kind === 'ready'
@@ -89,7 +109,16 @@ export function Dashboard() {
     try {
       const blob = await api.exportBoard(board.id)
       downloadBlob(blob, `${safeName(board.title)}.obx`)
+      track('board_exported', {
+        board_id_hash: hashBoardId(board.id),
+        source: 'dashboard',
+      })
     } catch (err) {
+      track('board_exported', {
+        board_id_hash: hashBoardId(board.id),
+        source: 'dashboard',
+        status: 'error',
+      })
       alert('Export failed: ' + (err as Error).message)
     }
   }, [])
@@ -146,7 +175,13 @@ export function Dashboard() {
                 key={board.id}
                 board={board}
                 index={i}
-                onOpen={() => setLocation(`/b/${board.id}`)}
+                onOpen={() => {
+                  track('dashboard_board_opened', {
+                    board_id_hash: hashBoardId(board.id),
+                    index: i,
+                  })
+                  setLocation(`/b/${board.id}`)
+                }}
                 onRename={() => setRenaming(board)}
                 onExport={() => exportBoard(board)}
                 onDelete={() => setDeleting(board)}

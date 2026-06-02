@@ -8,6 +8,8 @@ interface Props {
   onToggle: (next: boolean) => void
   onRegenerate: () => void
   onDismissError: () => void
+  onCopy?: () => void
+  onOpenChange?: (open: boolean) => void
 }
 
 // Owner control for public read-only sharing. Toggling on mints a share link;
@@ -23,6 +25,8 @@ export function ShareButton({
   onToggle,
   onRegenerate,
   onDismissError,
+  onCopy,
+  onOpenChange,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -39,6 +43,7 @@ export function ShareButton({
     navigator.clipboard.writeText(shareUrl).then(
       () => {
         setCopied(true)
+        onCopy?.()
         setTimeout(() => setCopied(false), 1500)
       },
       () => {},
@@ -47,6 +52,7 @@ export function ShareButton({
 
   function closePopover() {
     setOpen(false)
+    onOpenChange?.(false)
     onDismissError()
   }
 
@@ -54,7 +60,13 @@ export function ShareButton({
     <div className="pointer-events-auto relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => {
+            const next = !o
+            onOpenChange?.(next)
+            return next
+          })
+        }}
         title="Share board"
         aria-label="Share board"
         className={`flex h-8 w-8 items-center justify-center rounded-full border shadow-[0_4px_24px_-8px_rgba(0,0,0,0.18)] backdrop-blur transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-1 ${

@@ -8,6 +8,7 @@ import { useAiVideoGenerate } from './useAiVideoGenerate'
 import { importHtmlFile } from './useAiHtmlImport'
 import { ModelPicker } from './ModelPicker'
 import { useAutoConnectArrows } from './useAutoConnectArrows'
+import { hashBoardId, track } from '../../analytics/posthog'
 
 interface Props {
   boardId: string
@@ -48,6 +49,11 @@ export function AiPromptBar({ boardId, editor }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Mirror `collapsed` into a ref so the keydown listener can read the current
+  // value without re-subscribing or capturing a stale closure.
+  const collapsedRef = useRef(collapsed)
+  collapsedRef.current = collapsed
+
   const didMountRef = useRef(false)
   useEffect(() => {
     if (!didMountRef.current) {
@@ -86,22 +92,17 @@ export function AiPromptBar({ boardId, editor }: Props) {
       const mod = e.metaKey || e.ctrlKey
       if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setCollapsed(false)
-        requestAnimationFrame(() =>
-          inputRef.current?.focus({ preventScroll: true })
-        )
+        expandPrompt('keyboard')
       } else if (mod && e.key === '\\') {
         // ⌘. is reserved by tldraw (Toggle Focus Mode), so use ⌘\ for show/hide.
         e.preventDefault()
-        setCollapsed((c) => {
-          if (!c) inputRef.current?.blur()
-          return !c
-        })
+        if (collapsedRef.current) expandPrompt('keyboard')
+        else collapsePrompt('keyboard')
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [boardId, editor])
 
   // Listen for "Retry" requests from AI image error footer.
   useEffect(() => {
@@ -281,6 +282,47 @@ export function AiPromptBar({ boardId, editor }: Props) {
       ? `Ask about ${selection.length} selected shape${selection.length === 1 ? '' : 's'}…`
       : 'Ask the AI to add to your board…  (⌘K)'
 
+  function handleModeChange(next: Mode) {
+    if (next === mode) return
+    track('ai_prompt_mode_changed', {
+      board_id_hash: hashBoardId(boardId),
+      mode: next,
+      previous_mode: mode,
+    })
+    setMode(next)
+  }
+
+  function handleAutoConnectToggle() {
+    track('ai_auto_connect_toggled', {
+      board_id_hash: hashBoardId(boardId),
+      enabled: !autoConnect,
+      selection_shape_count: selection.length,
+    })
+    toggleAutoConnect()
+  }
+
+  function expandPrompt(source: 'pill' | 'keyboard') {
+    setCollapsed(false)
+    requestAnimationFrame(() =>
+      inputRef.current?.focus({ preventScroll: true })
+    )
+    track('ai_prompt_opened', {
+      board_id_hash: hashBoardId(boardId),
+      selection_shape_count: editor?.getSelectedShapes().length ?? selection.length,
+      source,
+    })
+  }
+
+  function collapsePrompt(source: 'button' | 'keyboard') {
+    inputRef.current?.blur()
+    setCollapsed(true)
+    track('ai_prompt_collapsed_toggled', {
+      board_id_hash: hashBoardId(boardId),
+      collapsed: true,
+      source,
+    })
+  }
+
   async function submit() {
     if (busy || !value.trim() || !editor) return
     const prompt = value
@@ -322,12 +364,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
         visible={collapsed}
         mode={mode}
         modKey={modKey}
-        onExpand={() => {
-          setCollapsed(false)
-          requestAnimationFrame(() =>
-            inputRef.current?.focus({ preventScroll: true })
-          )
-        }}
+        onExpand={() => expandPrompt('pill')}
       />
       <div
         aria-hidden={collapsed}
@@ -340,7 +377,7 @@ export function AiPromptBar({ boardId, editor }: Props) {
       >
         {/* Top strip: Mode toggle + (selection or aspect chips) + model picker */}
         <div className="flex items-center justify-between gap-2 px-1 pt-0.5">
-          <ModeToggle mode={mode} onChange={setMode} />
+          <ModeToggle mode={mode} onChange={handleModeChange} />
 
           <div className="flex items-center gap-1.5">
             {mode === 'image' ? (
@@ -357,19 +394,22 @@ export function AiPromptBar({ boardId, editor }: Props) {
               </span>
             ) : null}
             {useSelection && (
-              <AutoConnectToggle value={autoConnect} onChange={toggleAutoConnect} />
+              <AutoConnectToggle value={autoConnect} onChange={handleAutoConnectToggle} />
             )}
             <ImportHtmlButton
               disabled={!editor}
-              onPick={() => fileInputRef.current?.click()}
+              onPick={() => {
+                track('html_import_picker_opened', {
+                  board_id_hash: hashBoardId(boardId),
+                  source: 'prompt_bar',
+                })
+                fileInputRef.current?.click()
+              }}
             />
             <ModelPicker modality={mode} />
             <CollapseButton
               modKey={modKey}
-              onClick={() => {
-                inputRef.current?.blur()
-                setCollapsed(true)
-              }}
+              onClick={() => collapsePrompt('button')}
             />
           </div>
         </div>

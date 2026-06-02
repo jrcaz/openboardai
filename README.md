@@ -148,6 +148,28 @@ and set `BETTER_AUTH_TRUSTED_ORIGINS` to your deployed origin.
 
 ---
 
+## Privacy & analytics
+
+OpenBoard AI can optionally report anonymous usage metrics via [PostHog](https://posthog.com) so we can see how the app is used — visitor counts, auth and dashboard funnels, board creations, sharing, imports, which AI modalities (text / image / video / HTML) get used, and aggregate shape composition. **It's off entirely unless you build with a `VITE_POSTHOG_KEY` set.**
+
+When enabled, here's what is and is **not** sent:
+
+| Sent | Not sent |
+|---|---|
+| Anonymous distinct id (PostHog-generated, stored in your browser) | Any account identity, email, name |
+| Page path (`/`, `/dashboard`, `/b/:boardId`, `/p/:token`) — board ids and share tokens are hashed before sending | Raw board ids or share tokens in the URL |
+| Auth, dashboard, sharing, import, settings, and agent-key action names with success/error status | Account identity, email, name, key names, plaintext keys |
+| AI model id, aspect ratio, audio flag, mode (qa/prompt/brainstorm) | Your prompt text |
+| Prompt length **bucketed** (`0-50`, `51-200`, `201-1000`, `1000+`) | The actual prompt characters |
+| Shape counts by type per board | Shape text, board titles, image/video bytes, HTML source |
+| Browser, OS, country (PostHog defaults) | Fine-grained location |
+
+**To opt out:** click the gear icon in the top-right of any board → toggle "Anonymous usage tracking" off. From the landing page, click **Privacy** in the footer. The choice persists per browser. The app also automatically opts out if your browser sends the Do-Not-Track signal.
+
+Implementation lives in [`apps/web/src/analytics/`](apps/web/src/analytics/). The tracking analysis and event plan live in [`docs/posthog-analytics-plan.md`](docs/posthog-analytics-plan.md). Session recording, autocapture, and surveys are explicitly disabled.
+
+---
+
 ## Contributing
 
 Issues and PRs welcome. This is an early project, so a quick issue describing what you want to change before opening a large PR is appreciated.

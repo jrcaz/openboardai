@@ -14,6 +14,8 @@ import {
   getModelPreference,
   looksLikeBadModelError,
 } from '../../settings/useModelPreferences'
+import { hashBoardId, track } from '../../analytics/posthog'
+import { bucketPromptLength, categorizeError } from '../../analytics/events'
 
 interface GenerateVideoOptions {
   prompt: string
@@ -99,8 +101,8 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
         })
       }
 
+      const modelPref = getModelPreference('video')
       try {
-        const modelPref = getModelPreference('video')
         const res = await fetch('/api/ai/generate-video', {
           method: 'POST',
           headers: {
@@ -146,6 +148,17 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
           { history: 'ignore' },
         )
 
+        track('ai_video_generated', {
+          board_id_hash: hashBoardId(boardId),
+          model: modelPref ?? 'default',
+          aspect,
+          has_audio: generateAudio,
+          mode: sourceImageId ? 'image_to_video' : 'text_to_video',
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          duration_ms: Date.now() - startedAt,
+          status: 'success',
+        })
+
         return { shapeId, videoId: data.videoId }
       } catch (err) {
         console.error('[ai] video generate failed', err)
@@ -163,6 +176,17 @@ export function useAiVideoGenerate(boardId: string, editor: Editor | null) {
           },
           { history: 'ignore' },
         )
+        track('ai_video_generated', {
+          board_id_hash: hashBoardId(boardId),
+          model: modelPref ?? 'default',
+          aspect,
+          has_audio: generateAudio,
+          mode: sourceImageId ? 'image_to_video' : 'text_to_video',
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          duration_ms: Date.now() - startedAt,
+          status: 'error',
+          error_category: categorizeError(message),
+        })
         return undefined
       }
     },

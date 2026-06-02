@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api, type ValidateKeyResponse } from '../lib/api'
 import { useApiKey } from './useApiKey'
+import { useAnalytics } from '../analytics/useAnalytics'
+import { track } from '../analytics/posthog'
 
 interface Props {
   mode: 'setup' | 'settings'
@@ -98,6 +100,7 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
       setKey(trimmed)
       setCredits(result.credits)
       setStatus({ kind: 'idle' })
+      track('api_key_set', { mode })
       if (!isSetup) {
         setEditing(false)
         setValue('')
@@ -106,6 +109,7 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
       }
     } else {
       setStatus({ kind: 'error', message: reasonToMessage(result.reason) })
+      track('api_key_set', { mode, status: 'error', reason: result.reason })
     }
   }
 
@@ -115,6 +119,7 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
   }
 
   function onRemove() {
+    track('api_key_removed', { mode })
     setKey(null)
     onClose?.()
   }
@@ -154,15 +159,23 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
               id={`${inputId}-title`}
               className="text-[17px] font-semibold text-neutral-900"
             >
-              {isSetup ? 'Welcome to OpenBoard AI' : 'OpenRouter API key'}
+              {isSetup ? 'Welcome to OpenBoard AI' : 'Settings'}
             </h2>
           </div>
           <p className="mt-3 text-[13.5px] leading-relaxed text-neutral-600">
             {isSetup
               ? 'This app uses OpenRouter to power AI generation. Paste your key to get started — it’s stored only in this browser.'
-              : 'Update or remove the key OpenBoard AI uses for OpenRouter requests. The key is stored only in this browser.'}
+              : 'Manage your OpenRouter key and privacy preferences. All settings live in this browser.'}
           </p>
         </div>
+
+        {!isSetup && <AnalyticsSection />}
+
+        {!isSetup && (
+          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-neutral-500">
+            OpenRouter API key
+          </h3>
+        )}
 
         {!editing && storedKey ? (
           <div className="space-y-4">
@@ -311,5 +324,42 @@ export function ApiKeyDialog({ mode, onClose }: Props) {
       </div>
     </div>,
     document.body,
+  )
+}
+
+function AnalyticsSection() {
+  const { optedOut, setOptedOut } = useAnalytics()
+  const enabled = !optedOut
+  return (
+    <div className="mb-5">
+      <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-neutral-500">
+        Anonymous usage tracking
+      </h3>
+      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-[12.5px] leading-relaxed text-neutral-600">
+            Help improve OpenBoard AI by sharing anonymous usage data — page visits,
+            board creations, and structural counts (shapes per board, AI modalities
+            used). No prompts, responses, board titles, or canvas content are ever
+            sent.
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => setOptedOut(enabled)}
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${
+              enabled ? 'bg-amber-500' : 'bg-neutral-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${
+                enabled ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { track } from '../analytics/posthog'
 
 const STORAGE_KEY = 'openboard-ai:tools-visible'
 
@@ -18,7 +19,10 @@ export function useToolsVisible() {
     setVisibleState(next)
   }, [])
 
-  const toggle = useCallback(() => setVisible(!visible), [visible, setVisible])
+  const toggle = useCallback(() => {
+    setVisible(!visible)
+    track('tools_panel_toggled', { visible: !visible })
+  }, [visible, setVisible])
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {

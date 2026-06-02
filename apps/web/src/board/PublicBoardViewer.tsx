@@ -6,6 +6,8 @@ import { api } from '../lib/api'
 import { customShapeUtils } from './shapes/customShapeUtils'
 import { AssetBaseProvider } from './assetBase'
 import { PublicBadge } from './PublicBadge'
+import { countShapeTypes, snapshotSizeKb } from '../analytics/events'
+import { hashValue, track } from '../analytics/posthog'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
@@ -30,11 +32,26 @@ export function PublicBoardViewer() {
           snapshotRef.current = board.snapshot as unknown as TLStoreSnapshot
         }
         document.title = `${board.title || 'Untitled'} · OpenBoard AI`
+        const snap = snapshotRef.current
+        const { total, byType } = countShapeTypes(snap)
+        track('public_board_viewed', {
+          public_token_hash: hashValue(token),
+          shape_count: total,
+          shape_type_counts: byType,
+          snapshot_size_kb: snap ? snapshotSizeKb(snap) : 0,
+          status: 'success',
+        })
         setStatus('ready')
         forceMount((n) => n + 1)
       })
       .catch(() => {
-        if (!cancelled) setStatus('error')
+        if (!cancelled) {
+          track('public_board_viewed', {
+            public_token_hash: hashValue(token),
+            status: 'error',
+          })
+          setStatus('error')
+        }
       })
     return () => {
       cancelled = true

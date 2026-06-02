@@ -2,6 +2,8 @@ import { type Editor, type VecLike, createShapeId } from 'tldraw'
 import type { UploadHtmlRequest, UploadHtmlResponse } from '@openboard-ai/shared'
 import { AI_HTML_TYPE, type AiHtmlShape } from '../shapes/AiHtmlShapeUtil'
 import { createCustomShape, updateCustomShape } from '../shapes/customShape'
+import { hashBoardId, track } from '../../analytics/posthog'
+import { bucketByteSize, categorizeError } from '../../analytics/events'
 
 const MAX_HTML_UPLOAD_BYTES = 2_000_000
 const HTML_W = 600
@@ -34,6 +36,12 @@ export async function importHtmlFile(
   }
   if (file.size > MAX_HTML_UPLOAD_BYTES) {
     console.error('[html-import] file too large', file.name, file.size)
+    track('ai_html_imported', {
+      board_id_hash: hashBoardId(boardId),
+      byte_size_bucket: bucketByteSize(file.size),
+      status: 'error',
+      error_category: 'bad_request',
+    })
     // Drop a small error shape so the user sees something happened.
     placeErrorShape(
       editor,
@@ -101,6 +109,11 @@ export async function importHtmlFile(
       },
       { history: 'ignore' },
     )
+    track('ai_html_imported', {
+      board_id_hash: hashBoardId(boardId),
+      byte_size_bucket: bucketByteSize(file.size),
+      status: 'success',
+    })
   } catch (err) {
     console.error('[html-import] upload failed', err)
     const message = err instanceof Error ? err.message : 'Upload failed'
@@ -114,6 +127,12 @@ export async function importHtmlFile(
       },
       { history: 'ignore' },
     )
+    track('ai_html_imported', {
+      board_id_hash: hashBoardId(boardId),
+      byte_size_bucket: bucketByteSize(file.size),
+      status: 'error',
+      error_category: categorizeError(message),
+    })
   }
 }
 
