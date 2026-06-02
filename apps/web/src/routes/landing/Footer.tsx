@@ -1,7 +1,11 @@
 import { BrandMark } from './BrandMark'
 import { GITHUB_URL } from './links'
 
-export function LandingFooter() {
+interface Props {
+  onOpenPrivacy?: () => void
+}
+
+export function LandingFooter({ onOpenPrivacy }: Props) {
   return (
     <footer className="border-t border-neutral-100 bg-white">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 lg:flex-row lg:items-center lg:justify-between lg:px-8">
@@ -22,6 +26,15 @@ export function LandingFooter() {
           <a href={`${GITHUB_URL}/issues`} target="_blank" rel="noopener noreferrer" className="transition hover:text-neutral-900">
             Issues
           </a>
+          {onOpenPrivacy && (
+            <button
+              type="button"
+              onClick={onOpenPrivacy}
+              className="transition hover:text-neutral-900"
+            >
+              Privacy
+            </button>
+          )}
         </div>
       </div>
     </footer>

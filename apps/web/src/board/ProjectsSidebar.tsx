@@ -4,6 +4,7 @@ import type { BoardSummary } from '@openboard-ai/shared'
 import { api } from '../lib/api'
 import { relativeTime } from '../lib/relativeTime'
 import { BrandMark } from '../routes/landing/BrandMark'
+import { hashBoardId, track } from '../analytics/posthog'
 
 type LoadState =
   | { kind: 'idle' }
@@ -32,10 +33,19 @@ export function ProjectsSidebar({ boardId, isPresenting }: Props) {
     try {
       const boards = await api.listBoards()
       setState({ kind: 'ready', boards })
+      track('projects_sidebar_loaded', {
+        board_id_hash: hashBoardId(boardId),
+        board_count: boards.length,
+        status: 'success',
+      })
     } catch (err) {
       setState({ kind: 'error', message: (err as Error).message })
+      track('projects_sidebar_loaded', {
+        board_id_hash: hashBoardId(boardId),
+        status: 'error',
+      })
     }
-  }, [])
+  }, [boardId])
 
   // Lazy-load on first expand, refresh when navigating to a different board so
   // the active highlight and updatedAt times stay accurate.
@@ -83,8 +93,13 @@ export function ProjectsSidebar({ boardId, isPresenting }: Props) {
 
   const open = useCallback(() => {
     cancelCollapse()
-    setExpanded(true)
-  }, [cancelCollapse])
+    setExpanded((wasExpanded) => {
+      if (!wasExpanded) {
+        track('projects_sidebar_opened', { board_id_hash: hashBoardId(boardId) })
+      }
+      return true
+    })
+  }, [boardId, cancelCollapse])
 
   const handleFocusOut = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
     // If focus moved to something outside the panel, close. Treat the toggle
@@ -102,9 +117,14 @@ export function ProjectsSidebar({ boardId, isPresenting }: Props) {
     setCreating(true)
     try {
       const board = await api.createBoard()
+      track('board_created', {
+        source: 'projects_sidebar',
+        board_id_hash: hashBoardId(board.id),
+      })
       setLocation(`/b/${board.id}`)
     } catch (err) {
       setCreating(false)
+      track('board_created', { source: 'projects_sidebar', status: 'error' })
       alert('Failed to create board: ' + (err as Error).message)
     }
   }, [creating, setLocation])
@@ -112,9 +132,16 @@ export function ProjectsSidebar({ boardId, isPresenting }: Props) {
   const openBoard = useCallback(
     (id: string) => {
       if (id === boardId) {
+        track('projects_sidebar_current_board_clicked', {
+          board_id_hash: hashBoardId(boardId),
+        })
         setExpanded(false)
         return
       }
+      track('projects_sidebar_board_opened', {
+        from_board_id_hash: hashBoardId(boardId),
+        board_id_hash: hashBoardId(id),
+      })
       setLocation(`/b/${id}`)
     },
     [boardId, setLocation],
@@ -173,6 +200,10 @@ export function ProjectsSidebar({ boardId, isPresenting }: Props) {
             className="group flex min-w-0 items-center gap-2.5"
             onClick={(e) => {
               e.preventDefault()
+              track('projects_sidebar_dashboard_opened', {
+                board_id_hash: hashBoardId(boardId),
+                source: 'header',
+              })
               setLocation('/dashboard')
             }}
           >
@@ -272,7 +303,13 @@ export function ProjectsSidebar({ boardId, isPresenting }: Props) {
         <footer className="border-t border-neutral-200/80 px-3 py-2.5">
           <button
             type="button"
-            onClick={() => setLocation('/dashboard')}
+            onClick={() => {
+              track('projects_sidebar_dashboard_opened', {
+                board_id_hash: hashBoardId(boardId),
+                source: 'footer',
+              })
+              setLocation('/dashboard')
+            }}
             className="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900"
           >
             View all boards

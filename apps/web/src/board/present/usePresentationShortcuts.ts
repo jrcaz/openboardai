@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { Editor } from 'tldraw'
+import { track } from '../../analytics/posthog'
 
 interface Args {
   editor: Editor | null
@@ -37,7 +38,9 @@ export function usePresentationShortcuts({ editor, isPresenting, setIsPresenting
       if (k === 'l') {
         e.preventDefault()
         const cur = editor!.getCurrentToolId()
-        editor!.setCurrentTool(cur === 'laser' ? 'select' : 'laser')
+        const next = cur === 'laser' ? 'select' : 'laser'
+        editor!.setCurrentTool(next)
+        track('laser_pointer_toggled', { enabled: next === 'laser' })
       } else if (k === 'p') {
         e.preventDefault()
         const next = !isPresenting

@@ -1,6 +1,8 @@
 import { type Editor, type VecLike, createShapeId } from 'tldraw'
 import { MARKDOWN_TYPE, type MarkdownShape } from '../shapes/MarkdownShapeUtil'
 import { createCustomShape } from '../shapes/customShape'
+import { bucketByteSize } from '../../analytics/events'
+import { hashBoardId, track } from '../../analytics/posthog'
 
 const MAX_MD_BYTES = 1_000_000
 const MD_W = 480
@@ -16,6 +18,7 @@ export function isMarkdownFile(file: File): boolean {
 }
 
 interface ImportOptions {
+  boardId?: string
   point?: VecLike
 }
 
@@ -27,10 +30,15 @@ interface ImportOptions {
 export async function importMarkdownFile(
   editor: Editor,
   file: File,
-  { point }: ImportOptions,
+  { boardId, point }: ImportOptions,
 ): Promise<void> {
   if (!isMarkdownFile(file)) {
     console.warn('[markdown-import] skipping non-markdown file', file.name, file.type)
+    track('markdown_imported', {
+      ...(boardId ? { board_id_hash: hashBoardId(boardId) } : {}),
+      status: 'skipped',
+      file_size_bucket: bucketByteSize(file.size),
+    })
     return
   }
 
@@ -45,12 +53,23 @@ export async function importMarkdownFile(
       `# ${title}\n\n> File too large: ${mb} MB (max 1 MB). It was not imported.`,
       point,
     )
+    track('markdown_imported', {
+      ...(boardId ? { board_id_hash: hashBoardId(boardId) } : {}),
+      status: 'too_large',
+      file_size_bucket: bucketByteSize(file.size),
+    })
     return
   }
 
   // Reads as UTF-8; invalid byte sequences become U+FFFD rather than throwing.
   const raw = await file.text()
   placeShape(editor, title, raw, point)
+  track('markdown_imported', {
+    ...(boardId ? { board_id_hash: hashBoardId(boardId) } : {}),
+    status: 'success',
+    file_size_bucket: bucketByteSize(file.size),
+    char_count_bucket: bucketByteSize(raw.length),
+  })
 }
 
 function placeShape(

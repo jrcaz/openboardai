@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'wouter'
 import { signOut, useSession } from '../lib/auth-client'
+import { track } from '../analytics/posthog'
 
 function initials(name: string | null | undefined, email: string): string {
   const source = (name && name.trim()) || email
@@ -38,6 +39,7 @@ export function UserMenu() {
   async function handleSignOut() {
     setSigningOut(true)
     await signOut()
+    track('logout_completed')
     setLocation('/')
   }
 
@@ -72,6 +74,7 @@ export function UserMenu() {
               role="menuitem"
               onClick={() => {
                 setOpen(false)
+                track('user_menu_navigation_clicked', { destination: 'dashboard' })
                 setLocation('/dashboard')
               }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-neutral-700 transition hover:bg-neutral-100"
@@ -84,6 +87,7 @@ export function UserMenu() {
               role="menuitem"
               onClick={() => {
                 setOpen(false)
+                track('user_menu_navigation_clicked', { destination: 'settings' })
                 setLocation('/settings')
               }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-neutral-700 transition hover:bg-neutral-100"

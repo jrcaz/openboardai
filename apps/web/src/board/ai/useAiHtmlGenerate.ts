@@ -10,6 +10,8 @@ import {
   getModelPreference,
   looksLikeBadModelError,
 } from '../../settings/useModelPreferences'
+import { hashBoardId, track } from '../../analytics/posthog'
+import { bucketPromptLength, categorizeError } from '../../analytics/events'
 
 interface GenerateHtmlOptions {
   prompt: string
@@ -80,6 +82,8 @@ export function useAiHtmlGenerate(boardId: string, editor: Editor | null) {
         })
       }
 
+      const startedAt = Date.now()
+
       try {
         const modelPref = getModelPreference('text')
         const res = await fetch('/api/ai/generate-html', {
@@ -124,6 +128,13 @@ export function useAiHtmlGenerate(boardId: string, editor: Editor | null) {
           { history: 'ignore' },
         )
 
+        track('ai_html_generated', {
+          board_id_hash: hashBoardId(boardId),
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          duration_ms: Date.now() - startedAt,
+          status: 'success',
+        })
+
         return { shapeId, htmlId: data.htmlId }
       } catch (err) {
         console.error('[ai] html generate failed', err)
@@ -141,6 +152,13 @@ export function useAiHtmlGenerate(boardId: string, editor: Editor | null) {
           },
           { history: 'ignore' },
         )
+        track('ai_html_generated', {
+          board_id_hash: hashBoardId(boardId),
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          duration_ms: Date.now() - startedAt,
+          status: 'error',
+          error_category: categorizeError(message),
+        })
         return undefined
       }
     },

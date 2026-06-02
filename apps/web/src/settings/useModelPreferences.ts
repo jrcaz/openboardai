@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Modality } from '@openboard-ai/shared'
+import { track } from '../analytics/posthog'
 
 export const MODEL_PREFS_STORAGE = 'openboard-ai:models'
 
@@ -58,11 +59,18 @@ export function ModelPreferencesProvider({ children }: { children: ReactNode }) 
   const [preferences, setPreferences] = useState<ModelPreferences>(() => read())
   const isFirstRender = useRef(true)
 
+  // Mirror state into a ref so setPreference can read the current value (and
+  // skip no-op changes) without depending on `preferences`, keeping the
+  // tracking side-effect out of the state updater — which StrictMode would
+  // otherwise invoke twice in dev.
+  const preferencesRef = useRef(preferences)
+  preferencesRef.current = preferences
+
   const setPreference = useCallback((modality: Modality, id: string | null) => {
-    setPreferences((prev) => ({
-      ...prev,
-      [modality]: id && id.trim() ? id.trim() : null,
-    }))
+    const trimmed = id && id.trim() ? id.trim() : null
+    if (preferencesRef.current[modality] === trimmed) return
+    track('model_preference_changed', { modality, model: trimmed ?? 'default' })
+    setPreferences((prev) => ({ ...prev, [modality]: trimmed }))
   }, [])
 
   const clear = useCallback((modality: Modality) => {

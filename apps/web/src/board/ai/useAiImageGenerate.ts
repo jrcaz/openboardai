@@ -10,6 +10,8 @@ import {
   getModelPreference,
   looksLikeBadModelError,
 } from '../../settings/useModelPreferences'
+import { hashBoardId, track } from '../../analytics/posthog'
+import { bucketPromptLength, categorizeError } from '../../analytics/events'
 
 interface GenerateImageOptions {
   prompt: string
@@ -85,8 +87,10 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
         })
       }
 
+      const startedAt = Date.now()
+      const modelPref = getModelPreference('image')
+
       try {
-        const modelPref = getModelPreference('image')
         const res = await fetch('/api/ai/generate-image', {
           method: 'POST',
           headers: {
@@ -129,6 +133,15 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
           { history: 'ignore' },
         )
 
+        track('ai_image_generated', {
+          board_id_hash: hashBoardId(boardId),
+          model: modelPref ?? 'default',
+          aspect,
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          duration_ms: Date.now() - startedAt,
+          status: 'success',
+        })
+
         return { shapeId, imageId: data.imageId }
       } catch (err) {
         console.error('[ai] image generate failed', err)
@@ -146,6 +159,15 @@ export function useAiImageGenerate(boardId: string, editor: Editor | null) {
           },
           { history: 'ignore' },
         )
+        track('ai_image_generated', {
+          board_id_hash: hashBoardId(boardId),
+          model: modelPref ?? 'default',
+          aspect,
+          prompt_length_bucket: bucketPromptLength(trimmed.length),
+          duration_ms: Date.now() - startedAt,
+          status: 'error',
+          error_category: categorizeError(message),
+        })
         return undefined
       }
     },

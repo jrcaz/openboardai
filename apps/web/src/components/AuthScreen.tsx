@@ -3,6 +3,7 @@ import { Link, Redirect, useLocation } from 'wouter'
 import { BrandMark } from '../routes/landing/BrandMark'
 import { signIn, signUp, useSession } from '../lib/auth-client'
 import { api } from '../lib/api'
+import { track } from '../analytics/posthog'
 
 type Mode = 'login' | 'signup'
 
@@ -58,6 +59,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     const params = new URLSearchParams(window.location.search)
     if (params.get('error')) {
       setError('Couldn’t sign in with GitHub. Please try again.')
+      track('auth_failed', { provider: 'github', source: 'oauth_callback' })
       window.history.replaceState(null, '', window.location.pathname)
     }
   }, [])
@@ -86,6 +88,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
 
     if (result.error) {
       setSubmitting(false)
+      track('auth_failed', { provider: 'email', mode })
       setError(
         result.error.message ||
           (isSignup
@@ -94,12 +97,14 @@ export function AuthScreen({ mode }: { mode: Mode }) {
       )
       return
     }
+    track(isSignup ? 'signup_completed' : 'login_completed', { provider: 'email' })
     setLocation('/dashboard')
   }
 
   async function handleGithub() {
     setGithubSubmitting(true)
     setError(null)
+    track('auth_github_started', { mode })
     // Absolute callback URLs so the post-OAuth redirect lands on the web origin
     // (in dev the API is on a different port). Both go through a full-page
     // redirect; on success Better Auth navigates us, on failure it returns here
@@ -111,6 +116,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     })
     if (result?.error) {
       setGithubSubmitting(false)
+      track('auth_failed', { provider: 'github', mode })
       setError('Couldn’t sign in with GitHub. Please try again.')
     }
   }

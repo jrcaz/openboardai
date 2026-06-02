@@ -4,6 +4,8 @@ import { useLocation } from 'wouter'
 import { type Editor, loadSnapshot, type TLStoreSnapshot } from 'tldraw'
 import { api } from '../lib/api'
 import { downloadBlob, parseObx, remintAndRemap, type ParsedObx, type RemappedObx } from './io/obx'
+import { hashBoardId, track } from '../analytics/posthog'
+import { countShapeTypes } from '../analytics/events'
 
 interface Props {
   editor: Editor | null
@@ -30,6 +32,7 @@ export function FileMenu({ editor, boardId }: Props) {
       const blob = await api.exportBoard(boardId)
       const filename = filenameFromHeader(blob) ?? `board-${boardId}.obx`
       downloadBlob(blob, filename)
+      track('board_exported', { board_id_hash: hashBoardId(boardId) })
     } catch (err) {
       console.error('[file-menu] export failed', err)
       setStatus({ kind: 'error', message: (err as Error).message })
@@ -62,9 +65,14 @@ export function FileMenu({ editor, boardId }: Props) {
         setStatus({ kind: 'importing', mode, progress: 'Creating board…' })
         const newBoard = await api.createBoard(parsed.title || 'Imported board')
         targetBoardId = newBoard.id
+        track('board_created', {
+          source: 'file_import',
+          board_id_hash: hashBoardId(newBoard.id),
+        })
       } else {
         setStatus({ kind: 'importing', mode, progress: 'Clearing existing assets…' })
         await api.deleteBoardAssets(targetBoardId)
+        track('board_assets_cleared', { board_id_hash: hashBoardId(targetBoardId) })
       }
 
       let i = 0
@@ -91,6 +99,13 @@ export function FileMenu({ editor, boardId }: Props) {
 
       setStatus({ kind: 'importing', mode, progress: 'Saving canvas…' })
       await api.saveSnapshot(targetBoardId, remapped.snapshot)
+
+      const { total } = countShapeTypes(remapped.snapshot as unknown as Record<string, unknown>)
+      track('board_imported', {
+        board_id_hash: hashBoardId(targetBoardId),
+        mode,
+        shape_count: total,
+      })
 
       if (mode === 'new') {
         setLocation(`/b/${targetBoardId}`)
