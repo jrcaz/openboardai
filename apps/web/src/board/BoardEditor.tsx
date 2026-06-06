@@ -27,7 +27,6 @@ import { importMarkdownFile, isMarkdownFile } from './ai/useMarkdownImport'
 import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
-import { SettingsButton } from '../settings/SettingsButton'
 import { UserMenu } from '../components/UserMenu'
 import { GitHubBadge } from './GitHubBadge'
 import { ToolsToggle } from './ToolsToggle'
@@ -368,7 +367,6 @@ export function BoardEditor({ boardId }: Props) {
         />
         <FileMenu editor={editor} boardId={boardId} />
         <ToolsToggle visible={toolsVisible} onToggle={toggleTools} />
-        <SettingsButton />
         <div className="pointer-events-auto">
           <UserMenu />
         </div>
