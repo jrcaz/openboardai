@@ -241,7 +241,10 @@ export function BoardEditor({ boardId }: Props) {
       return () => {
         unlisten()
         window.removeEventListener('beforeunload', flush)
-        if (saveTimerRef.current != null) clearTimeout(saveTimerRef.current)
+        // The editor now remounts on board switch (BoardPage keys by boardId).
+        // If a debounced save is still pending, flush it to this board so the
+        // last edits aren't dropped on the way out.
+        if (saveTimerRef.current != null) flush()
       }
     },
     [boardId],
