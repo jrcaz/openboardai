@@ -101,6 +101,7 @@ export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [boardTitle, setBoardTitle] = useState('Untitled')
   // Set when the board 404s but is an ownerless legacy board the user can claim.
   const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
   // Public sharing state owned at this level so the ShareButton is purely
@@ -132,6 +133,7 @@ export function BoardEditor({ boardId }: Props) {
         if (board.snapshot && Object.keys(board.snapshot).length > 0) {
           initialSnapshotRef.current = board.snapshot as unknown as TLStoreSnapshot
         }
+        setBoardTitle(board.title || 'Untitled')
         setShare({ isPublic: board.isPublic, shareToken: board.shareToken })
         loadedRef.current = true
         // Force a render to mount <Tldraw> with the snapshot prop.
@@ -295,6 +297,24 @@ export function BoardEditor({ boardId }: Props) {
     }
   }, [boardId])
 
+  const handleRename = useCallback(
+    async (title: string) => {
+      const requestedFor = boardId
+      const previousTitle = boardTitle
+      setBoardTitle(title)
+      try {
+        const board = await api.renameBoard(requestedFor, title)
+        if (currentBoardIdRef.current !== requestedFor) return
+        setBoardTitle(board.title || 'Untitled')
+      } catch (err) {
+        if (currentBoardIdRef.current !== requestedFor) return
+        setBoardTitle(previousTitle)
+        throw err
+      }
+    },
+    [boardId, boardTitle],
+  )
+
   usePresentationShortcuts({ editor, isPresenting, setIsPresenting })
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
@@ -355,6 +375,11 @@ export function BoardEditor({ boardId }: Props) {
         licenseKey={TLDRAW_LICENSE_KEY || undefined}
       />
       <ProjectsSidebar boardId={boardId} isPresenting={isPresenting} />
+      <BoardTitleInlineEditor
+        title={boardTitle}
+        isPresenting={isPresenting}
+        onRename={handleRename}
+      />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
         <ShareButton
@@ -392,3 +417,118 @@ export function BoardEditor({ boardId }: Props) {
   )
 }
 
+function BoardTitleInlineEditor({
+  title,
+  isPresenting,
+  onRename,
+}: {
+  title: string
+  isPresenting: boolean
+  onRename: (title: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(title)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!editing) setDraft(title)
+  }, [title, editing])
+
+  useEffect(() => {
+    if (!editing) return
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [editing])
+
+  const commit = useCallback(async () => {
+    const next = draft.trim()
+    if (!next) {
+      setDraft(title)
+      setEditing(false)
+      setError(null)
+      return
+    }
+    if (next === title) {
+      setEditing(false)
+      setError(null)
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    try {
+      await onRename(next)
+      setEditing(false)
+    } catch (err) {
+      setError('Could not rename board.')
+      console.error('[board] rename failed', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [draft, onRename, title])
+
+  const cancel = useCallback(() => {
+    setDraft(title)
+    setEditing(false)
+    setError(null)
+  }, [title])
+
+  if (isPresenting) return null
+
+  return (
+    <div className="board-title-control pointer-events-auto absolute left-1/2 top-14 z-[500] flex -translate-x-1/2 flex-col items-center sm:top-3">
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={draft}
+          maxLength={200}
+          disabled={saving}
+          aria-label="Board title"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              cancel()
+            }
+          }}
+          className="h-9 w-[min(360px,calc(100vw-32px))] rounded-lg border border-neutral-200 bg-white/95 px-3 text-center text-[14px] font-semibold text-neutral-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 disabled:opacity-70 sm:w-[min(360px,calc(100vw-240px))]"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="group flex h-9 max-w-[min(360px,calc(100vw-32px))] items-center gap-1.5 rounded-lg border border-neutral-200 bg-white/90 px-3 text-[14px] font-semibold text-neutral-900 shadow-sm backdrop-blur transition hover:border-neutral-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 sm:max-w-[min(360px,calc(100vw-240px))]"
+          title="Rename board"
+        >
+          <span className="truncate">{title || 'Untitled'}</span>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0 text-neutral-400 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100"
+            aria-hidden="true"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4Z" />
+          </svg>
+        </button>
+      )}
+      {error && (
+        <div className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11.5px] font-medium text-red-700 shadow-sm">
+          {error}
+        </div>
+      )}
+    </div>
+  )
+}
