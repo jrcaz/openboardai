@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DefaultToolbar,
   DefaultToolbarContent,
@@ -64,7 +64,7 @@ const uiOverrides: TLUiOverrides = {
   },
 }
 
-const components: TLComponents = {
+const baseComponents: TLComponents = {
   Toolbar: (props) => {
     const tools = useTools()
     const isSelected = useIsToolSelected(tools[SPREADSHEET_TYPE])
@@ -319,6 +319,24 @@ export function BoardEditor({ boardId }: Props) {
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
 
+  const editorComponents = useMemo<TLComponents>(
+    () => ({
+      ...baseComponents,
+      MenuPanel: () => (
+        <nav className="tlui-menu-zone board-title-menu-zone" aria-label="Board">
+          <BoardTitleInlineEditor
+            title={boardTitle}
+            isPresenting={isPresenting}
+            onRename={handleRename}
+          />
+        </nav>
+      ),
+      HelperButtons: null,
+      TopPanel: null,
+    }),
+    [boardTitle, handleRename, isPresenting],
+  )
+
   if (claimable) {
     return (
       <ClaimBoardScreen
@@ -368,18 +386,13 @@ export function BoardEditor({ boardId }: Props) {
         shapeUtils={customShapeUtils}
         tools={customTools}
         overrides={uiOverrides}
-        components={components}
+        components={editorComponents}
         assetUrls={assetUrls}
         snapshot={initialSnapshotRef.current ?? undefined}
         onMount={handleMount}
         licenseKey={TLDRAW_LICENSE_KEY || undefined}
       />
       <ProjectsSidebar boardId={boardId} isPresenting={isPresenting} />
-      <BoardTitleInlineEditor
-        title={boardTitle}
-        isPresenting={isPresenting}
-        onRename={handleRename}
-      />
       <div className="top-right-cluster pointer-events-none absolute right-4 top-4 z-[500] flex items-center gap-2">
         <GitHubBadge />
         <ShareButton
@@ -478,7 +491,7 @@ function BoardTitleInlineEditor({
   if (isPresenting) return null
 
   return (
-    <div className="board-title-control pointer-events-auto absolute left-1/2 top-14 z-[500] flex -translate-x-1/2 flex-col items-center sm:top-3">
+    <div className="board-title-control pointer-events-auto relative flex h-10 w-[min(320px,calc(100vw-136px))] flex-col items-stretch">
       {editing ? (
         <input
           ref={inputRef}
@@ -497,13 +510,13 @@ function BoardTitleInlineEditor({
               cancel()
             }
           }}
-          className="h-9 w-[min(360px,calc(100vw-32px))] rounded-lg border border-neutral-200 bg-white/95 px-3 text-center text-[14px] font-semibold text-neutral-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 disabled:opacity-70 sm:w-[min(360px,calc(100vw-240px))]"
+          className="m-1 h-8 w-[calc(100%-8px)] rounded-md border border-neutral-300 bg-white px-2.5 text-[13px] font-semibold text-neutral-900 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 disabled:opacity-70"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="group flex h-9 max-w-[min(360px,calc(100vw-32px))] items-center gap-1.5 rounded-lg border border-neutral-200 bg-white/90 px-3 text-[14px] font-semibold text-neutral-900 shadow-sm backdrop-blur transition hover:border-neutral-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 sm:max-w-[min(360px,calc(100vw-240px))]"
+          className="group flex h-10 w-full max-w-full items-center gap-1.5 px-3 text-[13px] font-semibold text-neutral-900 transition hover:bg-neutral-200/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-300"
           title="Rename board"
         >
           <span className="truncate">{title || 'Untitled'}</span>
@@ -525,7 +538,7 @@ function BoardTitleInlineEditor({
         </button>
       )}
       {error && (
-        <div className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11.5px] font-medium text-red-700 shadow-sm">
+        <div className="absolute left-0 top-full mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11.5px] font-medium text-red-700 shadow-sm">
           {error}
         </div>
       )}
