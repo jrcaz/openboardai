@@ -59,6 +59,35 @@ export type BoardSummary = z.infer<typeof BoardSummary>
 export const BoardListResponse = z.array(BoardSummary)
 export type BoardListResponse = z.infer<typeof BoardListResponse>
 
+// --- Board templates ---
+
+export const BoardTemplateSummary = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  isPublic: z.boolean(),
+  owner: z.enum(['user', 'public']),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type BoardTemplateSummary = z.infer<typeof BoardTemplateSummary>
+
+export const BoardTemplateListResponse = z.array(BoardTemplateSummary)
+export type BoardTemplateListResponse = z.infer<typeof BoardTemplateListResponse>
+
+export const CreateTemplateRequest = z.object({
+  boardId: z.string(),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(500).optional(),
+  isPublic: z.boolean().optional(),
+})
+export type CreateTemplateRequest = z.infer<typeof CreateTemplateRequest>
+
+export const CreateBoardFromTemplateRequest = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+})
+export type CreateBoardFromTemplateRequest = z.infer<typeof CreateBoardFromTemplateRequest>
+
 // Whether an ownerless (pre-accounts) board can be claimed by the current user.
 // `title` is the legacy board's title, shown on the claim screen; null when the
 // board isn't claimable.

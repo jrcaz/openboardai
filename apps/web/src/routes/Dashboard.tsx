@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'wouter'
-import type { BoardSummary } from '@openboard-ai/shared'
+import type { BoardSummary, BoardTemplateSummary } from '@openboard-ai/shared'
 import { api } from '../lib/api'
 import { relativeTime } from '../lib/relativeTime'
 import { downloadBlob } from '../board/io/obx'
@@ -19,12 +19,16 @@ export function Dashboard() {
   const [creating, setCreating] = useState(false)
   const [renaming, setRenaming] = useState<BoardSummary | null>(null)
   const [deleting, setDeleting] = useState<BoardSummary | null>(null)
+  const [templating, setTemplating] = useState<BoardSummary | null>(null)
+  const [templates, setTemplates] = useState<BoardTemplateSummary[]>([])
+  const [templateBusy, setTemplateBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setState({ kind: 'loading' })
     try {
-      const boards = await api.listBoards()
+      const [boards, loadedTemplates] = await Promise.all([api.listBoards(), api.listTemplates()])
       setState({ kind: 'ready', boards })
+      setTemplates(loadedTemplates)
     } catch (err) {
       setState({ kind: 'error', message: (err as Error).message })
     }
@@ -45,6 +49,36 @@ export function Dashboard() {
       alert('Failed to create board: ' + (err as Error).message)
     }
   }, [creating, setLocation])
+
+  const createFromTemplate = useCallback(
+    async (template: BoardTemplateSummary) => {
+      if (templateBusy) return
+      setTemplateBusy(template.id)
+      try {
+        const board = await api.createBoardFromTemplate(template.id)
+        setLocation(`/b/${board.id}`)
+      } catch (err) {
+        alert('Failed to create board from template: ' + (err as Error).message)
+        setTemplateBusy(null)
+      }
+    },
+    [setLocation, templateBusy],
+  )
+
+  const saveTemplate = useCallback(async (board: BoardSummary, title: string, description: string, isPublic: boolean) => {
+    try {
+      const template = await api.createTemplate({
+        boardId: board.id,
+        title,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        isPublic,
+      })
+      setTemplates((current) => [template, ...current])
+      setTemplating(null)
+    } catch (err) {
+      alert('Failed to save template: ' + (err as Error).message)
+    }
+  }, [])
 
   // Optimistic rename — patch the list immediately, roll back on failure.
   const commitRename = useCallback(
@@ -134,25 +168,36 @@ export function Dashboard() {
           <ErrorState message={state.message} onRetry={load} />
         )}
 
+        {state.kind === 'ready' && templates.length > 0 && (
+          <TemplateStrip
+            templates={templates}
+            busyId={templateBusy}
+            onUse={createFromTemplate}
+          />
+        )}
+
         {state.kind === 'ready' && state.boards.length === 0 && (
           <EmptyState onCreate={createBoard} creating={creating} />
         )}
 
         {state.kind === 'ready' && state.boards.length > 0 && (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <CreateCard onCreate={createBoard} creating={creating} />
-            {state.boards.map((board, i) => (
-              <BoardCard
-                key={board.id}
-                board={board}
-                index={i}
-                onOpen={() => setLocation(`/b/${board.id}`)}
-                onRename={() => setRenaming(board)}
-                onExport={() => exportBoard(board)}
-                onDelete={() => setDeleting(board)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <CreateCard onCreate={createBoard} creating={creating} />
+              {state.boards.map((board, i) => (
+                <BoardCard
+                  key={board.id}
+                  board={board}
+                  index={i}
+                  onOpen={() => setLocation(`/b/${board.id}`)}
+                  onRename={() => setRenaming(board)}
+                  onExport={() => exportBoard(board)}
+                  onSaveTemplate={() => setTemplating(board)}
+                  onDelete={() => setDeleting(board)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </main>
 
@@ -170,11 +215,74 @@ export function Dashboard() {
           onConfirm={() => commitDelete(deleting)}
         />
       )}
+      {templating && (
+        <SaveTemplateDialog
+          board={templating}
+          onCancel={() => setTemplating(null)}
+          onSubmit={(title, description, isPublic) =>
+            saveTemplate(templating, title, description, isPublic)
+          }
+        />
+      )}
     </div>
   )
 }
 
 // --- Cards ---
+
+function TemplateStrip({
+  templates,
+  busyId,
+  onUse,
+}: {
+  templates: BoardTemplateSummary[]
+  busyId: string | null
+  onUse: (template: BoardTemplateSummary) => void
+}) {
+  return (
+    <section className="mb-8">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[15px] font-semibold text-neutral-900">Templates</h2>
+        <span className="text-[12px] text-neutral-500">{templates.length} saved</span>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {templates.map((template) => (
+          <button
+            key={template.id}
+            type="button"
+            onClick={() => onUse(template)}
+            disabled={Boolean(busyId)}
+            className="group flex min-h-24 items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.35)] disabled:cursor-wait disabled:opacity-70"
+          >
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+              <TemplateIcon />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <span className="truncate text-[13.5px] font-semibold text-neutral-900">
+                  {template.title}
+                </span>
+                {template.owner === 'public' && (
+                  <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700">
+                    Public
+                  </span>
+                )}
+              </span>
+              {template.description && (
+                <span className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-neutral-500">
+                  {template.description}
+                </span>
+              )}
+              <span className="mt-2 block text-[12px] font-medium text-amber-700">
+                {busyId === template.id ? 'Creating…' : 'Use template'}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 function CreateCard({ onCreate, creating }: { onCreate: () => void; creating: boolean }) {
   return (
@@ -209,6 +317,7 @@ function BoardCard({
   onOpen,
   onRename,
   onExport,
+  onSaveTemplate,
   onDelete,
 }: {
   board: BoardSummary
@@ -216,6 +325,7 @@ function BoardCard({
   onOpen: () => void
   onRename: () => void
   onExport: () => void
+  onSaveTemplate: () => void
   onDelete: () => void
 }) {
   return (
@@ -244,7 +354,12 @@ function BoardCard({
           <div className="truncate text-[14px] font-semibold text-neutral-900">{board.title}</div>
           <div className="mt-0.5 text-[12px] text-neutral-500">Edited {relativeTime(board.updatedAt)}</div>
         </div>
-        <CardMenu onRename={onRename} onExport={onExport} onDelete={onDelete} />
+        <CardMenu
+          onRename={onRename}
+          onExport={onExport}
+          onSaveTemplate={onSaveTemplate}
+          onDelete={onDelete}
+        />
       </div>
     </div>
   )
@@ -253,10 +368,12 @@ function BoardCard({
 function CardMenu({
   onRename,
   onExport,
+  onSaveTemplate,
   onDelete,
 }: {
   onRename: () => void
   onExport: () => void
+  onSaveTemplate: () => void
   onDelete: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -321,6 +438,7 @@ function CardMenu({
             style={{ top: coords.top, right: coords.right, animationDuration: '0.15s' }}
           >
             <MenuItem onClick={() => { setOpen(false); onRename() }} label="Rename" icon={<PencilIcon />} />
+            <MenuItem onClick={() => { setOpen(false); onSaveTemplate() }} label="Save template" icon={<TemplateIcon />} />
             <MenuItem onClick={() => { setOpen(false); onExport() }} label="Export (.obx)" icon={<DownloadIcon />} />
             <MenuItem
               onClick={() => { setOpen(false); onDelete() }}
@@ -506,6 +624,96 @@ function RenameDialog({
   )
 }
 
+function SaveTemplateDialog({
+  board,
+  onCancel,
+  onSubmit,
+}: {
+  board: BoardSummary
+  onCancel: () => void
+  onSubmit: (title: string, description: string, isPublic: boolean) => void
+}) {
+  const [title, setTitle] = useState(board.title)
+  const [description, setDescription] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  return (
+    <ModalShell onCancel={onCancel}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!title.trim()) return
+          onSubmit(title.trim(), description, isPublic)
+        }}
+      >
+        <h2 className="text-[16px] font-semibold text-neutral-900">Save as template</h2>
+        <p className="mt-1.5 text-[13px] leading-relaxed text-neutral-600">
+          Capture <span className="font-medium text-neutral-800">{board.title}</span> so future
+          boards can start from the same layout.
+        </p>
+        <label className="mt-4 block text-[12.5px] font-medium text-neutral-700" htmlFor="template-title">
+          Template name
+        </label>
+        <input
+          id="template-title"
+          ref={inputRef}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={200}
+          className="mt-1.5 w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-[14px] text-neutral-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+        />
+        <label className="mt-4 block text-[12.5px] font-medium text-neutral-700" htmlFor="template-description">
+          Description
+        </label>
+        <textarea
+          id="template-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          maxLength={500}
+          rows={3}
+          className="mt-1.5 w-full resize-none rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-[14px] text-neutral-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+        />
+        <label className="mt-4 flex items-start gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(e) => setIsPublic(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-amber-500"
+          />
+          <span>
+            <span className="block text-[13px] font-medium text-neutral-800">Share with all users</span>
+            <span className="mt-0.5 block text-[12px] leading-relaxed text-neutral-500">
+              Public templates appear in everyone’s template picker.
+            </span>
+          </span>
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg px-3.5 py-2 text-[13px] font-medium text-neutral-600 transition hover:bg-neutral-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!title.trim()}
+            className="rounded-lg bg-neutral-900 px-3.5 py-2 text-[13px] font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-40"
+          >
+            Save template
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
 function ConfirmDeleteDialog({
   board,
   onCancel,
@@ -562,6 +770,15 @@ function DownloadIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
       <path d="M7 10l5 5 5-5M12 15V3" />
+    </svg>
+  )
+}
+
+function TemplateIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M8 4v16M3 10h18M13 14h4" />
     </svg>
   )
 }
