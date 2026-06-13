@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { useLocation, useParams } from 'wouter'
 import { UserMenu } from '../components/UserMenu'
 import { AgentKeysSection } from '../settings/AgentKeysSection'
+import { OpenRouterKeySection } from '../settings/OpenRouterKeySection'
 import { BrandMark } from './landing/BrandMark'
 
 type SectionDef = {
@@ -15,6 +16,14 @@ type SectionDef = {
 }
 
 const SECTIONS: readonly SectionDef[] = [
+  {
+    slug: 'openrouter-key',
+    label: 'OpenRouter key',
+    description: 'The API key that powers AI generation on your boards',
+    Icon: SparkIcon,
+    enabled: true,
+    Component: OpenRouterKeySection,
+  },
   {
     slug: 'agent-keys',
     label: 'Agent keys',
@@ -200,6 +209,26 @@ function ComingSoon({ section }: { section: SectionDef }) {
         {section.description}. Coming soon.
       </div>
     </div>
+  )
+}
+
+function SparkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4L12 3z" />
+      <path d="M18 14l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8.8-1.9z" />
+    </svg>
   )
 }
 
