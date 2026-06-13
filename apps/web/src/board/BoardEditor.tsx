@@ -3,9 +3,18 @@ import {
   DefaultToolbar,
   DefaultToolbarContent,
   Tldraw,
+  TldrawUiButton,
+  TldrawUiButtonIcon,
+  TldrawUiButtonLabel,
   TldrawUiMenuItem,
   type Editor,
+  type TLCamera,
+  type TLCameraOptions,
   type TLComponents,
+  type TLImageShape,
+  type TLRecord,
+  type TLShape,
+  type TLShapeId,
   type TLStoreSnapshot,
   type TLUiAssetUrlOverrides,
   type TLUiOverrides,
@@ -79,6 +88,13 @@ const components: TLComponents = {
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
+type ImageAnnotationSession = {
+  imageId: TLShapeId
+  wasLocked: boolean
+  camera: TLCamera
+  cameraOptions: TLCameraOptions
+}
+
 // Maps an HTTP status (parsed out of `lib/api.ts`'s "HTTP <code>: <body>"
 // error string) to a short message we can render in the share popover.
 function friendlyShareError(err: unknown, fallback: string): string {
@@ -100,6 +116,8 @@ interface Props {
 export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<TLImageShape | null>(null)
+  const [annotationSession, setAnnotationSession] = useState<ImageAnnotationSession | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   // Set when the board 404s but is an ownerless legacy board the user can claim.
   const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
@@ -247,6 +265,121 @@ export function BoardEditor({ boardId }: Props) {
     [boardId],
   )
 
+  useEffect(() => {
+    if (!editor) {
+      setSelectedImage(null)
+      return
+    }
+    const updateSelection = () => {
+      const selected = editor.getSelectedShapes()
+      setSelectedImage(
+        selected.length === 1 && selected[0]?.type === 'image'
+          ? (selected[0] as TLImageShape)
+          : null,
+      )
+    }
+    updateSelection()
+    return editor.store.listen(updateSelection, { source: 'all', scope: 'session' })
+  }, [editor])
+
+  const annotationShapeIdsRef = useRef(new Set<TLShapeId>())
+
+  useEffect(() => {
+    if (!editor || !annotationSession) return
+    annotationShapeIdsRef.current = new Set()
+    const unlisten = editor.store.listen(
+      (entry) => {
+        for (const record of Object.values(entry.changes.added) as TLRecord[]) {
+          if (record.typeName !== 'shape') continue
+          const shape = record as TLShape
+          if (shape.id !== annotationSession.imageId && shape.type !== 'group') {
+            annotationShapeIdsRef.current.add(shape.id)
+          }
+        }
+      },
+      { source: 'user', scope: 'document' },
+    )
+    return unlisten
+  }, [annotationSession, editor])
+
+  const startImageAnnotation = useCallback(() => {
+    if (!editor || !selectedImage || annotationSession) return
+    const bounds = editor.getShapePageBounds(selectedImage.id)
+    if (!bounds) return
+
+    const camera = editor.getCamera()
+    const cameraOptions = editor.getCameraOptions()
+    setAnnotationSession({
+      imageId: selectedImage.id,
+      wasLocked: selectedImage.isLocked,
+      camera,
+      cameraOptions,
+    })
+
+    editor.run(
+      () => {
+        editor.updateShape<TLImageShape>({ id: selectedImage.id, type: 'image', isLocked: true })
+        editor.selectNone()
+        editor.setCurrentTool('draw')
+        editor.setCameraOptions({
+          ...cameraOptions,
+          constraints: {
+            bounds: { x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h },
+            padding: { x: 96, y: 96 },
+            origin: { x: 0.5, y: 0.5 },
+            initialZoom: 'fit-max-100',
+            baseZoom: 'fit-max-100',
+            behavior: 'contain',
+          },
+        })
+        editor.zoomToBounds(bounds, { inset: 96, animation: { duration: 180 } })
+      },
+      { ignoreShapeLock: true },
+    )
+  }, [annotationSession, editor, selectedImage])
+
+  const finishImageAnnotation = useCallback(
+    (group: boolean) => {
+      if (!editor || !annotationSession) return
+      const image = editor.getShape(annotationSession.imageId) as TLImageShape | undefined
+      const annotationIds = [...annotationShapeIdsRef.current].filter((id) => editor.getShape(id))
+
+      editor.run(
+        () => {
+          if (image) {
+            editor.updateShape<TLImageShape>({
+              id: annotationSession.imageId,
+              type: 'image',
+              isLocked: annotationSession.wasLocked,
+            })
+          }
+          editor.setCameraOptions(annotationSession.cameraOptions)
+          editor.setCamera(annotationSession.camera, { force: true })
+          editor.setCurrentTool('select')
+          if (group && image && annotationIds.length > 0) {
+            editor.groupShapes([annotationSession.imageId, ...annotationIds], { select: true })
+          } else if (image) {
+            editor.select(annotationSession.imageId)
+          }
+        },
+        { ignoreShapeLock: true },
+      )
+      annotationShapeIdsRef.current = new Set()
+      setAnnotationSession(null)
+    },
+    [annotationSession, editor],
+  )
+
+  useEffect(() => {
+    if (!annotationSession) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      finishImageAnnotation(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [annotationSession, finishImageAnnotation])
+
   // Mirrors the current `boardId` prop so async share handlers below can detect
   // when the user has navigated to a different board mid-flight and skip
   // writing the stale response into the new board's share state.
@@ -379,6 +512,43 @@ export function BoardEditor({ boardId }: Props) {
         />
       </div>
       <LaserCursor editor={editor} />
+      {!isPresenting && !annotationSession && selectedImage && (
+        <div className="pointer-events-auto absolute left-1/2 top-24 z-[520] -translate-x-1/2 sm:top-16">
+          <TldrawUiButton
+            type="normal"
+            title="Annotate image"
+            onClick={startImageAnnotation}
+            className="shadow-lg"
+          >
+            <TldrawUiButtonIcon icon="tool-pencil" />
+            <TldrawUiButtonLabel>Annotate image</TldrawUiButtonLabel>
+          </TldrawUiButton>
+        </div>
+      )}
+      {!isPresenting && annotationSession && (
+        <div className="pointer-events-auto absolute left-1/2 top-20 z-[620] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-2 rounded-lg border border-amber-200 bg-white/95 px-2 py-1.5 shadow-lg backdrop-blur sm:top-4">
+          <div className="flex items-center gap-2 px-2 text-[12px] font-medium text-neutral-700">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            Image annotation
+          </div>
+          <TldrawUiButton
+            type="normal"
+            title="Cancel image annotation"
+            onClick={() => finishImageAnnotation(false)}
+          >
+            <TldrawUiButtonIcon icon="cross-2" />
+            <TldrawUiButtonLabel>Cancel</TldrawUiButtonLabel>
+          </TldrawUiButton>
+          <TldrawUiButton
+            type="primary"
+            title="Done annotating image"
+            onClick={() => finishImageAnnotation(true)}
+          >
+            <TldrawUiButtonIcon icon="check" />
+            <TldrawUiButtonLabel>Done</TldrawUiButtonLabel>
+          </TldrawUiButton>
+        </div>
+      )}
       <div
         className={`transition-all duration-200 ${
           isPresenting
@@ -391,4 +561,3 @@ export function BoardEditor({ boardId }: Props) {
     </div>
   )
 }
-
