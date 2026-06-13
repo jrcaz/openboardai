@@ -4,7 +4,9 @@ import type { Editor } from 'tldraw'
 interface Args {
   editor: Editor | null
   isPresenting: boolean
-  setIsPresenting: (next: boolean) => void
+  enterPresentation: () => void
+  exitPresentation: () => void
+  stepPresentation: (delta: -1 | 1) => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -15,7 +17,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return false
 }
 
-export function usePresentationShortcuts({ editor, isPresenting, setIsPresenting }: Args) {
+export function usePresentationShortcuts({
+  editor,
+  isPresenting,
+  enterPresentation,
+  exitPresentation,
+  stepPresentation,
+}: Args) {
   useEffect(() => {
     if (!editor) return
 
@@ -24,14 +32,24 @@ export function usePresentationShortcuts({ editor, isPresenting, setIsPresenting
 
       if (e.key === 'Escape') {
         if (isPresenting) {
-          setIsPresenting(false)
-          editor!.setCurrentTool('select')
+          exitPresentation()
           // Don't preventDefault — tldraw's own Esc behavior (deselect) is fine to also fire.
         }
         return
       }
 
       if (isTypingTarget(e.target)) return
+
+      if (isPresenting && (e.key === 'ArrowRight' || e.key === 'PageDown')) {
+        e.preventDefault()
+        stepPresentation(1)
+        return
+      }
+      if (isPresenting && (e.key === 'ArrowLeft' || e.key === 'PageUp')) {
+        e.preventDefault()
+        stepPresentation(-1)
+        return
+      }
 
       const k = e.key.toLowerCase()
       if (k === 'l') {
@@ -40,13 +58,12 @@ export function usePresentationShortcuts({ editor, isPresenting, setIsPresenting
         editor!.setCurrentTool(cur === 'laser' ? 'select' : 'laser')
       } else if (k === 'p') {
         e.preventDefault()
-        const next = !isPresenting
-        setIsPresenting(next)
-        editor!.setCurrentTool(next ? 'laser' : 'select')
+        if (isPresenting) exitPresentation()
+        else enterPresentation()
       }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editor, isPresenting, setIsPresenting])
+  }, [editor, enterPresentation, exitPresentation, isPresenting, stepPresentation])
 }

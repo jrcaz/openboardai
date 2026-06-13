@@ -5,6 +5,8 @@ import {
   Tldraw,
   TldrawUiMenuItem,
   type Editor,
+  type TLFrameShape,
+  type TLShapeId,
   type TLComponents,
   type TLStoreSnapshot,
   type TLUiAssetUrlOverrides,
@@ -27,6 +29,12 @@ import { importMarkdownFile, isMarkdownFile } from './ai/useMarkdownImport'
 import { PresentationToggle } from './present/PresentationToggle'
 import { LaserCursor } from './present/LaserCursor'
 import { usePresentationShortcuts } from './present/usePresentationShortcuts'
+import { SlideshowControls } from './present/SlideshowControls'
+import {
+  findInitialPresentationFrame,
+  getPresentationFrames,
+  moveToPresentationFrame,
+} from './present/slides'
 import { SettingsButton } from '../settings/SettingsButton'
 import { UserMenu } from '../components/UserMenu'
 import { GitHubBadge } from './GitHubBadge'
@@ -100,6 +108,7 @@ interface Props {
 export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
+  const [presentationFrameId, setPresentationFrameId] = useState<TLShapeId | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   // Set when the board 404s but is an ownerless legacy board the user can claim.
   const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
@@ -295,7 +304,57 @@ export function BoardEditor({ boardId }: Props) {
     }
   }, [boardId])
 
-  usePresentationShortcuts({ editor, isPresenting, setIsPresenting })
+  const enterPresentation = useCallback(() => {
+    if (!editor) return
+    setIsPresenting(true)
+    editor.setCurrentTool('laser')
+
+    const frames = getPresentationFrames(editor)
+    const initialFrame = findInitialPresentationFrame(editor, frames)
+    setPresentationFrameId(initialFrame?.id ?? null)
+    if (initialFrame) moveToPresentationFrame(editor, initialFrame.id)
+  }, [editor])
+
+  const exitPresentation = useCallback(() => {
+    if (!editor) return
+    setIsPresenting(false)
+    setPresentationFrameId(null)
+    editor.setCurrentTool('select')
+  }, [editor])
+
+  const stepPresentation = useCallback(
+    (delta: -1 | 1) => {
+      if (!editor) return
+      const frames = getPresentationFrames(editor)
+      if (frames.length === 0) {
+        setPresentationFrameId(null)
+        return
+      }
+
+      const fallback = findInitialPresentationFrame(editor, frames)
+      const currentIndex = presentationFrameId
+        ? frames.findIndex((frame: TLFrameShape) => frame.id === presentationFrameId)
+        : -1
+      const fallbackIndex = fallback
+        ? frames.findIndex((frame: TLFrameShape) => frame.id === fallback.id)
+        : 0
+      const baseIndex = currentIndex >= 0 ? currentIndex : Math.max(fallbackIndex, 0)
+      const nextIndex = (baseIndex + delta + frames.length) % frames.length
+      const next = frames[nextIndex]
+      if (!next) return
+      setPresentationFrameId(next.id)
+      moveToPresentationFrame(editor, next.id)
+    },
+    [editor, presentationFrameId],
+  )
+
+  usePresentationShortcuts({
+    editor,
+    isPresenting,
+    enterPresentation,
+    exitPresentation,
+    stepPresentation,
+  })
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
 
@@ -375,10 +434,17 @@ export function BoardEditor({ boardId }: Props) {
         <PresentationToggle
           editor={editor}
           isPresenting={isPresenting}
-          onPresentChange={setIsPresenting}
+          onEnter={enterPresentation}
+          onExit={exitPresentation}
         />
       </div>
       <LaserCursor editor={editor} />
+      <SlideshowControls
+        editor={editor}
+        isPresenting={isPresenting}
+        currentFrameId={presentationFrameId}
+        onStep={stepPresentation}
+      />
       <div
         className={`transition-all duration-200 ${
           isPresenting
@@ -391,4 +457,3 @@ export function BoardEditor({ boardId }: Props) {
     </div>
   )
 }
-
