@@ -26,7 +26,12 @@ import {
   type VideoAspect,
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
-import { DEFAULTS, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
+import {
+  DEFAULTS,
+  buildSystemPrompt,
+  getOpenRouter,
+  modelSupportsToolCalling,
+} from '../ai/openrouter.js'
 import { generateAndPersistHtml, persistUploadedHtml } from '../ai/html.js'
 import { fetchUrlForModel } from '../ai/fetchUrl.js'
 import { generateAndPersistImage } from '../ai/image.js'
@@ -80,6 +85,7 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
   const { messages, boardId, mode, context, resultShapeId, model } = c.req.valid('json')
   await requireBoardOwner(c, boardId)
   const selected = model?.trim() || DEFAULTS.text
+  const canvasTools = modelSupportsToolCalling(selected)
 
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   const promptText = lastUser?.content ?? ''
@@ -256,10 +262,9 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
 
   const result = streamText({
     model: openrouter.chat(selected),
-    system: buildSystemPrompt({ mode, context }),
+    system: buildSystemPrompt({ mode, context, canvasTools }),
     messages: llmMessages,
-    tools,
-    stopWhen: stepCountIs(5),
+    ...(canvasTools ? { tools, stopWhen: stepCountIs(5) } : {}),
     onFinish: async ({ text }) => {
       try {
         await db.insert(schema.aiMessages).values({
