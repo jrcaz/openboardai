@@ -3,27 +3,66 @@ import type { TLAsset, TLAssetStore } from 'tldraw'
 import type { UploadImageRequest, UploadVideoRequest } from '@openboard-ai/shared'
 
 const OPENBOARD_ASSET_SRC_PREFIX = 'openboardai:'
+const OPENBOARD_ASSET_META_KEY = 'openboardAsset'
 
 type StoredAssetKind = 'image' | 'video'
+type StoredAssetRef = { kind: StoredAssetKind; id: string }
+type JsonValue = null | string | number | boolean | JsonValue[] | { [key: string]: JsonValue }
+type JsonObject = { [key: string]: JsonValue }
 
-export function toOpenBoardAssetSrc(kind: StoredAssetKind, id: string): string {
-  return `${OPENBOARD_ASSET_SRC_PREFIX}${kind}:${encodeURIComponent(id)}`
+export function toOpenBoardAssetSrc(kind: StoredAssetKind, id: string, assetBase = '/api'): string {
+  const base = assetBase.replace(/\/$/, '')
+  const collection = kind === 'image' ? 'images' : 'videos'
+  return `${base}/${collection}/${encodeURIComponent(id)}`
+}
+
+export function toOpenBoardAssetMeta(kind: StoredAssetKind, id: string): JsonObject {
+  return { [OPENBOARD_ASSET_META_KEY]: { kind, id } }
 }
 
 export function parseOpenBoardAssetSrc(
   src: string | null | undefined,
-): { kind: StoredAssetKind; id: string } | null {
-  if (!src?.startsWith(OPENBOARD_ASSET_SRC_PREFIX)) return null
-  const rest = src.slice(OPENBOARD_ASSET_SRC_PREFIX.length)
-  const sep = rest.indexOf(':')
-  if (sep === -1) return null
-  const kind = rest.slice(0, sep)
-  if (kind !== 'image' && kind !== 'video') return null
+): StoredAssetRef | null {
+  if (!src) return null
+
+  if (src.startsWith(OPENBOARD_ASSET_SRC_PREFIX)) {
+    const rest = src.slice(OPENBOARD_ASSET_SRC_PREFIX.length)
+    const sep = rest.indexOf(':')
+    if (sep === -1) return null
+    const kind = rest.slice(0, sep)
+    if (kind !== 'image' && kind !== 'video') return null
+    try {
+      return { kind, id: decodeURIComponent(rest.slice(sep + 1)) }
+    } catch {
+      return null
+    }
+  }
+
+  const path = parsePathname(src)
+  if (!path) return null
+  const match = /^\/api\/(?:public\/)?(images|videos)\/([^/?#]+)$/.exec(path)
+  if (!match) return null
+  const kind = match[1] === 'images' ? 'image' : 'video'
   try {
-    return { kind, id: decodeURIComponent(rest.slice(sep + 1)) }
+    return { kind, id: decodeURIComponent(match[2]!) }
   } catch {
     return null
   }
+}
+
+export function getOpenBoardAssetRef(asset: TLAsset): StoredAssetRef | null {
+  const raw = (asset.meta as Record<string, unknown> | undefined)?.[OPENBOARD_ASSET_META_KEY]
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    'kind' in raw &&
+    'id' in raw &&
+    (raw.kind === 'image' || raw.kind === 'video') &&
+    typeof raw.id === 'string'
+  ) {
+    return { kind: raw.kind, id: raw.id }
+  }
+  return parseOpenBoardAssetSrc(getMediaProps(asset).src)
 }
 
 export function resolveOpenBoardAssetSrc(
@@ -33,9 +72,7 @@ export function resolveOpenBoardAssetSrc(
   if (!src) return null
   const parsed = parseOpenBoardAssetSrc(src)
   if (!parsed) return src
-  const base = assetBase.replace(/\/$/, '')
-  const collection = parsed.kind === 'image' ? 'images' : 'videos'
-  return `${base}/${collection}/${encodeURIComponent(parsed.id)}`
+  return toOpenBoardAssetSrc(parsed.kind, parsed.id, assetBase)
 }
 
 export function createBoardAssetStore(boardId: string, assetBase = '/api'): TLAssetStore {
@@ -68,9 +105,14 @@ export function createBoardAssetStore(boardId: string, assetBase = '/api'): TLAs
         await uploadJson('/api/images/upload', common satisfies UploadImageRequest, abortSignal)
       }
 
-      return { src: toOpenBoardAssetSrc(kind, id) }
+      return {
+        src: toOpenBoardAssetSrc(kind, id, assetBase),
+        meta: toOpenBoardAssetMeta(kind, id),
+      }
     },
     resolve(asset) {
+      const stored = getOpenBoardAssetRef(asset)
+      if (stored) return toOpenBoardAssetSrc(stored.kind, stored.id, assetBase)
       return resolveOpenBoardAssetSrc(getMediaProps(asset).src, assetBase)
     },
     async remove() {
@@ -86,6 +128,8 @@ export function createReadonlyBoardAssetStore(assetBase = '/api'): TLAssetStore 
       throw new Error('Cannot upload assets in a read-only board viewer.')
     },
     resolve(asset) {
+      const stored = getOpenBoardAssetRef(asset)
+      if (stored) return toOpenBoardAssetSrc(stored.kind, stored.id, assetBase)
       return resolveOpenBoardAssetSrc(getMediaProps(asset).src, assetBase)
     },
   }
@@ -147,5 +191,14 @@ async function uploadJson(
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ''}`)
+  }
+}
+
+function parsePathname(src: string): string | null {
+  if (src.startsWith('/')) return src.split(/[?#]/, 1)[0] || null
+  try {
+    return new URL(src).pathname
+  } catch {
+    return null
   }
 }

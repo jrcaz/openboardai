@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { TLAsset } from 'tldraw'
+import { createTLStore, type TLAsset } from 'tldraw'
 import {
   createBoardAssetStore,
   createReadonlyBoardAssetStore,
@@ -21,6 +21,9 @@ describe('boardAssetStore', () => {
     expect(resolveOpenBoardAssetSrc(src)).toBe('/api/images/img%3Aabc%20123')
     expect(resolveOpenBoardAssetSrc(src, '/api/public')).toBe(
       '/api/public/images/img%3Aabc%20123',
+    )
+    expect(resolveOpenBoardAssetSrc('/api/videos/vid-1', '/api/public')).toBe(
+      '/api/public/videos/vid-1',
     )
     expect(resolveOpenBoardAssetSrc('data:image/png;base64,abc')).toBe(
       'data:image/png;base64,abc',
@@ -52,6 +55,10 @@ describe('boardAssetStore', () => {
     const result = await createBoardAssetStore('board-1').upload(asset, file)
 
     expect(parseOpenBoardAssetSrc(result.src)).toMatchObject({ kind: 'image' })
+    expect(result.src).toMatch(/^\/api\/images\/[A-Za-z0-9_-]{12}$/)
+    expect(result.meta).toMatchObject({
+      openboardAsset: { kind: 'image', id: expect.any(String) },
+    })
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/images/upload',
@@ -74,6 +81,38 @@ describe('boardAssetStore', () => {
       height: 20,
     })
     expect(body.id).toHaveLength(12)
+  })
+
+  it('returns uploaded image assets that satisfy tldraw schema validation', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 201 })))
+
+    const store = createTLStore()
+    const baseAsset = {
+      id: 'asset:test-image',
+      typeName: 'asset',
+      type: 'image',
+      meta: {},
+      props: {
+        h: 20,
+        isAnimated: false,
+        mimeType: 'image/png',
+        name: 'sample.png',
+        src: null,
+        w: 30,
+      },
+    } as TLAsset
+    const result = await createBoardAssetStore('board-1').upload(
+      baseAsset,
+      new File(['abc'], 'sample.png', { type: 'image/png' }),
+    )
+
+    const uploadedAsset = {
+      ...baseAsset,
+      meta: result.meta ?? {},
+      props: { ...baseAsset.props, src: result.src },
+    } as TLAsset
+
+    expect(() => store.put([uploadedAsset])).not.toThrow()
   })
 
   it('resolves stored asset references in read-only viewers', () => {
