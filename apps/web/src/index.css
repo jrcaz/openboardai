@@ -234,6 +234,10 @@ body,
   padding-left: 40px;
 }
 
+.board-title-menu-zone {
+  overflow: visible;
+}
+
 /* In presentation mode the toggle is unmounted, so drop the left padding to
    avoid an offset coordinate space for tldraw's hidden top chrome. */
 .app-shell.is-presenting .tlui-layout__top__left {

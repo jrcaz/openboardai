@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DefaultToolbar,
   DefaultToolbarContent,
@@ -63,7 +63,7 @@ const uiOverrides: TLUiOverrides = {
   },
 }
 
-const components: TLComponents = {
+const baseComponents: TLComponents = {
   Toolbar: (props) => {
     const tools = useTools()
     const isSelected = useIsToolSelected(tools[SPREADSHEET_TYPE])
@@ -100,6 +100,7 @@ export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [boardTitle, setBoardTitle] = useState('Untitled')
   // Set when the board 404s but is an ownerless legacy board the user can claim.
   const [claimable, setClaimable] = useState<{ title: string | null } | null>(null)
   // Public sharing state owned at this level so the ShareButton is purely
@@ -131,6 +132,7 @@ export function BoardEditor({ boardId }: Props) {
         if (board.snapshot && Object.keys(board.snapshot).length > 0) {
           initialSnapshotRef.current = board.snapshot as unknown as TLStoreSnapshot
         }
+        setBoardTitle(board.title || 'Untitled')
         setShare({ isPublic: board.isPublic, shareToken: board.shareToken })
         loadedRef.current = true
         // Force a render to mount <Tldraw> with the snapshot prop.
@@ -294,9 +296,45 @@ export function BoardEditor({ boardId }: Props) {
     }
   }, [boardId])
 
+  const handleRename = useCallback(
+    async (title: string) => {
+      const requestedFor = boardId
+      const previousTitle = boardTitle
+      setBoardTitle(title)
+      try {
+        const board = await api.renameBoard(requestedFor, title)
+        if (currentBoardIdRef.current !== requestedFor) return
+        setBoardTitle(board.title || 'Untitled')
+      } catch (err) {
+        if (currentBoardIdRef.current !== requestedFor) return
+        setBoardTitle(previousTitle)
+        throw err
+      }
+    },
+    [boardId, boardTitle],
+  )
+
   usePresentationShortcuts({ editor, isPresenting, setIsPresenting })
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
+
+  const editorComponents = useMemo<TLComponents>(
+    () => ({
+      ...baseComponents,
+      MenuPanel: () => (
+        <nav className="tlui-menu-zone board-title-menu-zone" aria-label="Board">
+          <BoardTitleInlineEditor
+            title={boardTitle}
+            isPresenting={isPresenting}
+            onRename={handleRename}
+          />
+        </nav>
+      ),
+      HelperButtons: null,
+      TopPanel: null,
+    }),
+    [boardTitle, handleRename, isPresenting],
+  )
 
   if (claimable) {
     return (
@@ -347,7 +385,7 @@ export function BoardEditor({ boardId }: Props) {
         shapeUtils={customShapeUtils}
         tools={customTools}
         overrides={uiOverrides}
-        components={components}
+        components={editorComponents}
         assetUrls={assetUrls}
         snapshot={initialSnapshotRef.current ?? undefined}
         onMount={handleMount}
@@ -390,3 +428,118 @@ export function BoardEditor({ boardId }: Props) {
   )
 }
 
+function BoardTitleInlineEditor({
+  title,
+  isPresenting,
+  onRename,
+}: {
+  title: string
+  isPresenting: boolean
+  onRename: (title: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(title)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!editing) setDraft(title)
+  }, [title, editing])
+
+  useEffect(() => {
+    if (!editing) return
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [editing])
+
+  const commit = useCallback(async () => {
+    const next = draft.trim()
+    if (!next) {
+      setDraft(title)
+      setEditing(false)
+      setError(null)
+      return
+    }
+    if (next === title) {
+      setEditing(false)
+      setError(null)
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    try {
+      await onRename(next)
+      setEditing(false)
+    } catch (err) {
+      setError('Could not rename board.')
+      console.error('[board] rename failed', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [draft, onRename, title])
+
+  const cancel = useCallback(() => {
+    setDraft(title)
+    setEditing(false)
+    setError(null)
+  }, [title])
+
+  if (isPresenting) return null
+
+  return (
+    <div className="board-title-control pointer-events-auto relative flex h-10 w-[min(320px,calc(100vw-136px))] flex-col items-stretch">
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={draft}
+          maxLength={200}
+          disabled={saving}
+          aria-label="Board title"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              cancel()
+            }
+          }}
+          className="m-1 h-8 w-[calc(100%-8px)] rounded-md border border-neutral-300 bg-white px-2.5 text-[13px] font-semibold text-neutral-900 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 disabled:opacity-70"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="group flex h-10 w-full max-w-full items-center gap-1.5 px-3 text-[13px] font-semibold text-neutral-900 transition hover:bg-neutral-200/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-300"
+          title="Rename board"
+        >
+          <span className="truncate">{title || 'Untitled'}</span>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0 text-neutral-400 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100"
+            aria-hidden="true"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4Z" />
+          </svg>
+        </button>
+      )}
+      {error && (
+        <div className="absolute left-0 top-full mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11.5px] font-medium text-red-700 shadow-sm">
+          {error}
+        </div>
+      )}
+    </div>
+  )
+}
