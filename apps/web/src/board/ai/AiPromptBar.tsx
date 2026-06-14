@@ -8,6 +8,7 @@ import { useAiVideoGenerate } from './useAiVideoGenerate'
 import { importHtmlFile } from './useAiHtmlImport'
 import { ModelPicker } from './ModelPicker'
 import { useAutoConnectArrows } from './useAutoConnectArrows'
+import type { AiHtmlShape } from '../shapes/AiHtmlShapeUtil'
 
 interface Props {
   boardId: string
@@ -249,9 +250,11 @@ export function AiPromptBar({ boardId, editor }: Props) {
     async function handleEdit(e: Event) {
       const detail = (e as CustomEvent<{ shapeId: string; prompt: string }>).detail
       if (!detail?.shapeId || !detail.prompt) return
+      const shape = editor!.getShape(detail.shapeId as TLShapeId) as AiHtmlShape | undefined
       await generateHtml({
         prompt: detail.prompt,
         reuseShapeId: detail.shapeId as TLShapeId,
+        editHtmlId: shape?.props.htmlId ?? undefined,
       })
     }
     window.addEventListener('ai-html:edit', handleEdit)
