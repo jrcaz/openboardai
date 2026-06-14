@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DefaultToolbar,
   DefaultToolbarContent,
@@ -45,6 +45,7 @@ import { FileMenu } from './FileMenu'
 import { BoardLoading } from './BoardLoading'
 import { ShareButton } from './ShareButton'
 import { ProjectsSidebar } from './ProjectsSidebar'
+import { createBoardAssetStore } from './boardAssetStore'
 
 const customTools = [SpreadsheetShapeTool]
 
@@ -241,7 +242,7 @@ export function BoardEditor({ boardId }: Props) {
         }, 1500)
       }
 
-      const unlisten = ed.store.listen(scheduleSave, { source: 'user', scope: 'document' })
+      const unlisten = ed.store.listen(scheduleSave, { source: 'all', scope: 'document' })
       // Save on unload too — debounce may be in flight.
       const flush = () => {
         if (saveTimerRef.current != null) {
@@ -431,6 +432,7 @@ export function BoardEditor({ boardId }: Props) {
   usePresentationShortcuts({ editor, isPresenting, setIsPresenting })
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
+  const assetStore = useMemo(() => createBoardAssetStore(boardId), [boardId])
 
   if (claimable) {
     return (
@@ -484,6 +486,7 @@ export function BoardEditor({ boardId }: Props) {
         components={components}
         assetUrls={assetUrls}
         snapshot={initialSnapshotRef.current ?? undefined}
+        assets={assetStore}
         onMount={handleMount}
         licenseKey={TLDRAW_LICENSE_KEY || undefined}
       />
