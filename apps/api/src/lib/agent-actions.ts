@@ -166,6 +166,7 @@ export async function generateOnBoard(
   if (opts.kind === 'image') {
     const persisted = await generateAndPersistImage({
       openrouter,
+      openRouterKey: opts.openRouterKey,
       boardId,
       prompt: opts.prompt,
       model: opts.model,
