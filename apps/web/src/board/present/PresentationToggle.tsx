@@ -3,17 +3,16 @@ import type { Editor } from 'tldraw'
 interface Props {
   editor: Editor | null
   isPresenting: boolean
-  onPresentChange: (next: boolean) => void
+  onEnter: () => void
+  onExit: () => void
 }
 
-export function PresentationToggle({ editor, isPresenting, onPresentChange }: Props) {
+export function PresentationToggle({ editor, isPresenting, onEnter, onExit }: Props) {
   if (!editor) return null
 
   function togglePresent() {
-    if (!editor) return
-    const next = !isPresenting
-    onPresentChange(next)
-    editor.setCurrentTool(next ? 'laser' : 'select')
+    if (isPresenting) onExit()
+    else onEnter()
   }
 
   return (
