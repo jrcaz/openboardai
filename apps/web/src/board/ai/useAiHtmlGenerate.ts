@@ -18,6 +18,8 @@ interface GenerateHtmlOptions {
   connectArrows?: boolean
   /** Reuse an existing shape (used by Retry). */
   reuseShapeId?: TLShapeId
+  /** Overwrite an existing stored HTML asset instead of creating a new one. */
+  editHtmlId?: string
 }
 
 const HTML_W = 600
@@ -31,13 +33,18 @@ export function useAiHtmlGenerate(boardId: string, editor: Editor | null) {
       contextShapes = [],
       connectArrows = false,
       reuseShapeId,
+      editHtmlId,
     }: GenerateHtmlOptions) => {
       if (!editor) return
       const trimmed = prompt.trim()
       if (!trimmed) return
 
       const shapeId = reuseShapeId ?? createShapeId()
-      const resolvedTitle = (title ?? trimmed).slice(0, 120) || 'Untitled'
+      const existingShape = reuseShapeId
+        ? (editor.getShape(reuseShapeId) as AiHtmlShape | undefined)
+        : undefined
+      const resolvedTitle =
+        (title ?? existingShape?.props.title ?? trimmed).slice(0, 120) || 'Untitled'
 
       if (reuseShapeId) {
         editor.run(() => {
@@ -48,7 +55,7 @@ export function useAiHtmlGenerate(boardId: string, editor: Editor | null) {
               prompt: trimmed,
               title: resolvedTitle,
               status: 'generating',
-              htmlId: null,
+              htmlId: editHtmlId ?? null,
               errorMessage: null,
             },
           })
@@ -92,6 +99,7 @@ export function useAiHtmlGenerate(boardId: string, editor: Editor | null) {
             boardId,
             prompt: trimmed,
             title: resolvedTitle,
+            ...(editHtmlId ? { editHtmlId } : {}),
             resultShapeId: shapeId as string,
             ...(modelPref ? { model: modelPref } : {}),
           } satisfies GenerateHtmlRequest),

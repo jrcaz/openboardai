@@ -114,6 +114,7 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
       : isInteracting
       ? 'border-violet-400 ring-2 ring-violet-200'
       : 'border-neutral-200'
+  const htmlRevision = prompt ? hashRevision(prompt) : '0'
 
   const showPencil =
     source === 'ai' &&
@@ -148,8 +149,8 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
         <div className="relative flex-1">
           {status === 'done' && htmlId && (
             <iframe
-              key={htmlId}
-              src={`${assetBase}/htmls/${htmlId}`}
+              key={`${htmlId}:${htmlRevision}`}
+              src={`${assetBase}/htmls/${htmlId}?v=${htmlRevision}`}
               title={title}
               sandbox="allow-scripts"
               referrerPolicy="no-referrer"
@@ -210,6 +211,14 @@ function AiHtmlComponent({ shape }: { shape: AiHtmlShape }) {
       </div>
     </HTMLContainer>
   )
+}
+
+function hashRevision(input: string): string {
+  let hash = 0
+  for (let i = 0; i < input.length; i += 1) {
+    hash = Math.imul(31, hash) + input.charCodeAt(i)
+  }
+  return (hash >>> 0).toString(36)
 }
 
 function HeaderBar({

@@ -194,6 +194,7 @@ export const GenerateHtmlRequest = z.object({
   boardId: z.string(),
   prompt: z.string().trim().min(1).max(4000),
   title: z.string().trim().max(120).optional(),
+  editHtmlId: z.string().optional(),
   resultShapeId: z.string().optional(),
   model: z.string().min(1).max(200).optional(),
 })

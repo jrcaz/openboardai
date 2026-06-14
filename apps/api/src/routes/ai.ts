@@ -27,7 +27,11 @@ import {
 } from '@openboard-ai/shared'
 import { db, schema } from '../db/client.js'
 import { DEFAULTS, buildSystemPrompt, getOpenRouter } from '../ai/openrouter.js'
-import { generateAndPersistHtml, persistUploadedHtml } from '../ai/html.js'
+import {
+  editAndPersistHtml,
+  generateAndPersistHtml,
+  persistUploadedHtml,
+} from '../ai/html.js'
 import { fetchUrlForModel } from '../ai/fetchUrl.js'
 import { generateAndPersistImage } from '../ai/image.js'
 import type { AuthEnv } from '../middleware/auth.js'
@@ -150,6 +154,58 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
         } catch (err) {
           const message = err instanceof Error ? err.message : 'unknown error'
           return { ok: false as const, error: message }
+        }
+      },
+    }),
+    update_html: tool({
+      description:
+        'Edit an EXISTING ai-html widget already on the canvas. Use this when the user asks to change, revise, update, restyle, fix, or edit an HTML widget that appears in the selected shapes. Target the widget by its shape id from the selected HTML source blocks. Single tool call per turn. Continue your text reply after calling the tool — describe what changed.',
+      inputSchema: z.object({
+        targetId: z
+          .string()
+          .describe('The selected ai-html shape id to edit, copied verbatim from an <html-source shape-id="..."> block.'),
+        title: z
+          .string()
+          .min(1)
+          .max(120)
+          .optional()
+          .describe('Optional updated widget title. Keep the current title if omitted.'),
+        prompt: z
+          .string()
+          .min(10)
+          .max(4000)
+          .describe('Specific edit instructions for the existing HTML widget.'),
+      }),
+      execute: async ({ targetId, title, prompt }) => {
+        const target = context?.shapes.find((s) => s.id === targetId && s.htmlRef?.htmlId)
+        const htmlId = target?.htmlRef?.htmlId
+        if (!htmlId) {
+          return {
+            ok: false as const,
+            error: 'Selected HTML widget was not found.',
+          }
+        }
+
+        try {
+          const result = await editAndPersistHtml({
+            openrouter,
+            boardId,
+            htmlId,
+            prompt,
+            title,
+            model: selected,
+            resultShapeId: targetId,
+          })
+          return {
+            ok: true as const,
+            htmlId: result.htmlId,
+            targetId,
+            title: result.title,
+            url: `/api/htmls/${result.htmlId}`,
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'unknown error'
+          return { ok: false as const, error: message, targetId }
         }
       },
     }),
@@ -286,19 +342,29 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
 
 ai.post('/generate-html', zValidator('json', GenerateHtmlRequest), async (c) => {
   const { openrouter } = requireOpenRouter(c)
-  const { boardId, prompt, title, resultShapeId, model } = c.req.valid('json')
+  const { boardId, prompt, title, editHtmlId, resultShapeId, model } = c.req.valid('json')
   await requireBoardOwner(c, boardId)
   const selected = model?.trim() || DEFAULTS.text
 
   try {
-    const { htmlId, title: resolvedTitle, byteSize } = await generateAndPersistHtml({
-      openrouter,
-      boardId,
-      prompt,
-      title,
-      model: selected,
-      resultShapeId: resultShapeId ?? null,
-    })
+    const { htmlId, title: resolvedTitle, byteSize } = editHtmlId
+      ? await editAndPersistHtml({
+          openrouter,
+          boardId,
+          htmlId: editHtmlId,
+          prompt,
+          title,
+          model: selected,
+          resultShapeId: resultShapeId ?? null,
+        })
+      : await generateAndPersistHtml({
+          openrouter,
+          boardId,
+          prompt,
+          title,
+          model: selected,
+          resultShapeId: resultShapeId ?? null,
+        })
     const body: GenerateHtmlResponse = {
       htmlId,
       url: `/api/htmls/${htmlId}`,

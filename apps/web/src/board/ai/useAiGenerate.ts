@@ -143,7 +143,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
       // update the right shape when the tool's output arrives.
       const toolCallShapes = new Map<
         string,
-        { id: TLShapeId; kind: 'html' | 'spreadsheet' }
+        { id: TLShapeId; kind: 'html' | 'html-update' | 'spreadsheet' }
       >()
 
       try {
@@ -314,6 +314,44 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
           if (
             chunk.type === 'tool-input-available' &&
+            chunk.toolName === 'update_html' &&
+            chunk.toolCallId
+          ) {
+            const input = chunk.input as {
+              targetId?: string
+              title?: string
+              prompt?: string
+            }
+            if (!input.targetId) continue
+            const htmlShapeId = input.targetId as TLShapeId
+            const shape = editor.getShape(htmlShapeId) as AiHtmlShape | undefined
+            if (!shape || shape.type !== AI_HTML_TYPE) continue
+            toolCallShapes.set(chunk.toolCallId, {
+              id: htmlShapeId,
+              kind: 'html-update',
+            })
+
+            editor.run(
+              () => {
+                updateCustomShape<AiHtmlShape>(editor, {
+                  id: htmlShapeId,
+                  type: AI_HTML_TYPE,
+                  props: {
+                    title: (input.title ?? shape.props.title).slice(0, 120),
+                    prompt: input.prompt ?? shape.props.prompt,
+                    status: 'generating',
+                    htmlId: shape.props.htmlId,
+                    errorMessage: null,
+                  },
+                })
+              },
+              { history: 'ignore' },
+            )
+            continue
+          }
+
+          if (
+            chunk.type === 'tool-input-available' &&
             chunk.toolName === 'move_shapes' &&
             chunk.toolCallId
           ) {
@@ -337,11 +375,11 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
             const entry = toolCallShapes.get(chunk.toolCallId)
             // Spreadsheets are fully built from the tool input above — nothing
             // to do when their output arrives.
-            if (!entry || entry.kind !== 'html') continue
+            if (!entry || (entry.kind !== 'html' && entry.kind !== 'html-update')) continue
             const htmlShapeId = entry.id
             const output = chunk.output as
               | { ok: true; htmlId: string; title: string; url: string }
-              | { ok: false; error: string }
+              | { ok: false; error: string; targetId?: string }
               | undefined
             if (!output) continue
 
@@ -375,7 +413,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 
           if (chunk.type === 'tool-output-error' && chunk.toolCallId) {
             const entry = toolCallShapes.get(chunk.toolCallId)
-            if (!entry || entry.kind !== 'html') continue
+            if (!entry || (entry.kind !== 'html' && entry.kind !== 'html-update')) continue
             const htmlShapeId = entry.id
             editor.run(
               () => {

@@ -1,4 +1,5 @@
 import { generateText } from 'ai'
+import { and, eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import sanitizeHtml from 'sanitize-html'
 import { db, schema } from '../db/client.js'
@@ -17,6 +18,10 @@ STRICT RULES:
 - Target a 600x400 viewport unless the user specifies otherwise. Use width: 100%; height: 100%; on body and set margin: 0.
 - Prefer terse, readable layout. Use system-font stack. Avoid heavy libraries; if you need a chart, write a small inline SVG or canvas script.
 - No network requests, no fetch(), no XHR.`
+
+const HTML_EDIT_SYSTEM_PROMPT = `${HTML_SYSTEM_PROMPT}
+- You are editing an existing HTML document. Preserve the parts that are not relevant to the requested change.
+- Return the full updated HTML document, not a patch or explanation.`
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   // Whitelist a generous set of tags so charts/tables/svg/canvas work.
@@ -120,6 +125,73 @@ export async function generateAndPersistHtml({
   })
 
   return { htmlId: id, title: resolvedTitle, byteSize: bytes.byteLength }
+}
+
+export async function editAndPersistHtml({
+  openrouter,
+  boardId,
+  htmlId,
+  prompt,
+  title,
+  model,
+  resultShapeId,
+}: GenerateAndPersistArgs & { htmlId: string }): Promise<{
+  htmlId: string
+  title: string
+  byteSize: number
+}> {
+  const [existing] = await db
+    .select({
+      title: schema.aiHtmls.title,
+      bytes: schema.aiHtmls.bytes,
+    })
+    .from(schema.aiHtmls)
+    .where(and(eq(schema.aiHtmls.id, htmlId), eq(schema.aiHtmls.boardId, boardId)))
+    .limit(1)
+
+  if (!existing) {
+    throw new Error('HTML widget not found.')
+  }
+
+  const currentHtml = (existing.bytes as Buffer).toString('utf-8')
+  const { text } = await generateText({
+    model: openrouter.chat(model),
+    system: HTML_EDIT_SYSTEM_PROMPT,
+    prompt:
+      `Edit the existing HTML document according to this request:\n${prompt}\n\n` +
+      `Existing HTML document:\n${currentHtml}`,
+  })
+
+  const sanitized = sanitizeHtmlDoc(text)
+  if (!/<html[\s>]/i.test(sanitized)) {
+    throw new Error(
+      'Model did not return a complete HTML document. Try a more specific prompt.',
+    )
+  }
+
+  const bytes = Buffer.from(sanitized, 'utf-8')
+  if (bytes.byteLength > MAX_AI_HTML_BYTES) {
+    throw new Error(
+      `Edited HTML is too large (${bytes.byteLength} bytes, max ${MAX_AI_HTML_BYTES}).`,
+    )
+  }
+
+  const resolvedTitle = (title ?? existing.title ?? prompt).trim().slice(0, 120) || 'Untitled'
+
+  await db
+    .update(schema.aiHtmls)
+    .set({
+      title: resolvedTitle,
+      prompt,
+      source: 'ai',
+      model,
+      byteSize: bytes.byteLength,
+      bytes,
+      resultShapeId: resultShapeId ?? null,
+    })
+    .where(and(eq(schema.aiHtmls.id, htmlId), eq(schema.aiHtmls.boardId, boardId)))
+
+  return { htmlId, title: resolvedTitle, byteSize: bytes.byteLength }
 }
 
 export async function persistUploadedHtml({
