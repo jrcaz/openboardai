@@ -3,9 +3,6 @@ import {
   DefaultToolbar,
   DefaultToolbarContent,
   Tldraw,
-  TldrawUiButton,
-  TldrawUiButtonIcon,
-  TldrawUiButtonLabel,
   TldrawUiMenuItem,
   type Editor,
   type TLCamera,
@@ -615,15 +612,15 @@ export function BoardEditor({ boardId }: Props) {
       <LaserCursor editor={editor} />
       {!isPresenting && !annotationSession && selectedImage && (
         <div className="pointer-events-auto absolute left-1/2 top-24 z-[520] -translate-x-1/2 sm:top-16">
-          <TldrawUiButton
-            type="normal"
+          <button
+            type="button"
             title="Annotate image"
             onClick={startImageAnnotation}
-            className="shadow-lg"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 text-[12px] font-semibold text-neutral-800 shadow-lg transition hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-amber-300"
           >
-            <TldrawUiButtonIcon icon="tool-pencil" />
-            <TldrawUiButtonLabel>Annotate image</TldrawUiButtonLabel>
-          </TldrawUiButton>
+            <PencilIcon />
+            <span>Annotate image</span>
+          </button>
         </div>
       )}
       {!isPresenting && annotationSession && (
@@ -632,22 +629,24 @@ export function BoardEditor({ boardId }: Props) {
             <span className="h-2 w-2 rounded-full bg-amber-500" />
             Image annotation
           </div>
-          <TldrawUiButton
-            type="normal"
+          <button
+            type="button"
             title="Cancel image annotation"
             onClick={() => finishImageAnnotation(false)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 text-[12px] font-semibold text-neutral-700 transition hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-amber-300"
           >
-            <TldrawUiButtonIcon icon="cross-2" />
-            <TldrawUiButtonLabel>Cancel</TldrawUiButtonLabel>
-          </TldrawUiButton>
-          <TldrawUiButton
-            type="primary"
+            <XIcon />
+            <span>Cancel</span>
+          </button>
+          <button
+            type="button"
             title="Done annotating image"
             onClick={() => finishImageAnnotation(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-2.5 text-[12px] font-semibold text-white transition hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-300"
           >
-            <TldrawUiButtonIcon icon="check" />
-            <TldrawUiButtonLabel>Done</TldrawUiButtonLabel>
-          </TldrawUiButton>
+            <CheckIcon />
+            <span>Done</span>
+          </button>
         </div>
       )}
       <SlideshowControls
@@ -666,6 +665,64 @@ export function BoardEditor({ boardId }: Props) {
         <AiPromptBar boardId={boardId} editor={editor} />
       </div>
     </div>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
+function XIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   )
 }
 
