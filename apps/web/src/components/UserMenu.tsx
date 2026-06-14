@@ -49,7 +49,7 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-400 text-[12.5px] font-semibold text-neutral-900 shadow-sm ring-1 ring-black/5 transition hover:brightness-105 active:scale-95"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-400 text-[11px] font-semibold text-neutral-900 shadow-sm ring-1 ring-black/5 transition hover:brightness-105 active:scale-95"
       >
         {initials(user.name, user.email)}
       </button>
