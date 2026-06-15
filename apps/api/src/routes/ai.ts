@@ -338,13 +338,14 @@ ai.post('/upload-html', zValidator('json', UploadHtmlRequest), async (c) => {
 })
 
 ai.post('/generate-image', zValidator('json', GenerateImageRequest), async (c) => {
-  const { openrouter } = requireOpenRouter(c)
+  const { openrouter, apiKey } = requireOpenRouter(c)
   const { boardId, prompt, aspect, resultShapeId, model } = c.req.valid('json')
   await requireBoardOwner(c, boardId)
 
   try {
     const persisted = await generateAndPersistImage({
       openrouter,
+      openRouterKey: apiKey,
       boardId,
       prompt,
       aspect,
