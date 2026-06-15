@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -17,6 +17,12 @@ import { useIsReadonly } from './useIsReadonly'
 
 export const AI_CARD_TYPE = 'ai-card' as const
 
+export type AiCitation = {
+  sourceId: string
+  url: string
+  title?: string
+}
+
 export type AiCardShape = TLBaseShape<
   typeof AI_CARD_TYPE,
   {
@@ -26,6 +32,7 @@ export type AiCardShape = TLBaseShape<
     text: string
     status: 'pending' | 'streaming' | 'done' | 'error'
     sourceShapeIds: string[]
+    citations?: AiCitation[]
     title: string | null
   }
 >
@@ -40,6 +47,13 @@ export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
     text: T.string,
     status: T.literalEnum('pending', 'streaming', 'done', 'error'),
     sourceShapeIds: T.arrayOf(T.string),
+    citations: T.arrayOf(
+      T.object({
+        sourceId: T.string,
+        url: T.string,
+        title: T.string.optional(),
+      }),
+    ).optional(),
     title: T.string.nullable(),
   }
 
@@ -51,6 +65,7 @@ export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
       text: '',
       status: 'pending',
       sourceShapeIds: [],
+      citations: [],
       title: null,
     }
   }
@@ -70,6 +85,7 @@ export class AiCardShapeUtil extends BaseBoxShapeUtil<AiCardShape> {
 
 function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor }) {
   const { prompt, text, status, w, h, title } = shape.props
+  const citations = shape.props.citations ?? []
   const readonly = useIsReadonly()
   const cardRef = useRef<HTMLDivElement>(null)
   const [isHovered, setHovered] = useState(false)
@@ -146,7 +162,9 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
           <div className="flex-1 px-3 py-2 text-[13px] leading-snug text-neutral-800">
             {text ? (
               <div className="ai-md break-words">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                  {linkifyCitationMarkers(text, citations)}
+                </ReactMarkdown>
                 {status === 'streaming' && <Caret />}
               </div>
             ) : status === 'pending' || status === 'streaming' ? (
@@ -161,11 +179,12 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
           </div>
 
           {status === 'done' && text && (
-            <footer className="flex items-center justify-end gap-1 border-t border-neutral-100 bg-neutral-50 px-2 py-1">
+            <footer className="flex items-center justify-between gap-2 border-t border-neutral-100 bg-neutral-50 px-2 py-1">
+              <CitationList citations={citations} />
               <button
                 onPointerDown={stopEventPropagation}
                 onClick={() => navigator.clipboard.writeText(text)}
-                className="rounded px-2 py-1 text-[11px] font-medium text-neutral-600 hover:bg-neutral-200"
+                className="shrink-0 rounded px-2 py-1 text-[11px] font-medium text-neutral-600 hover:bg-neutral-200"
               >
                 Copy
               </button>
@@ -199,6 +218,74 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
       </div>
     </HTMLContainer>
   )
+}
+
+const markdownComponents = {
+  a({ href, children }: { href?: string; children?: ReactNode }) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        onPointerDown={stopEventPropagation}
+        onClick={stopEventPropagation}
+      >
+        {children}
+      </a>
+    )
+  },
+}
+
+function CitationList({ citations }: { citations: AiCitation[] }) {
+  if (citations.length === 0) return <span />
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+      <span className="shrink-0 text-[10.5px] font-medium text-neutral-500">Sources</span>
+      <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+        {citations.map((citation, index) => {
+          const label = citation.title?.trim() || domainFromUrl(citation.url) || `Source ${index + 1}`
+          return (
+            <a
+              key={`${citation.sourceId}-${citation.url}`}
+              href={citation.url}
+              target="_blank"
+              rel="noreferrer"
+              title={label}
+              onPointerDown={stopEventPropagation}
+              onClick={stopEventPropagation}
+              className="inline-flex h-5 max-w-[120px] shrink-0 items-center gap-1 rounded border border-amber-200 bg-white px-1.5 text-[10.5px] font-medium text-amber-800 hover:border-amber-300 hover:bg-amber-50"
+            >
+              <span className="text-amber-600">[{index + 1}]</span>
+              <span className="truncate">{label}</span>
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function linkifyCitationMarkers(text: string, citations: AiCitation[]): string {
+  if (citations.length === 0) return text
+  return text.replace(/\[(\d+)\]/g, (marker, rawIndex: string) => {
+    const index = Number(rawIndex)
+    const citation = citations[index - 1]
+    if (!citation) return marker
+    return `[${index}](${escapeMarkdownUrl(citation.url)})`
+  })
+}
+
+function escapeMarkdownUrl(url: string): string {
+  return url.replace(/\)/g, '%29')
+}
+
+function domainFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return null
+  }
 }
 
 function StatusDot({ status }: { status: AiCardShape['props']['status'] }) {
