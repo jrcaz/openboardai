@@ -202,14 +202,14 @@ export function ModelPicker({ modality }: Props) {
     : 'default'
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div ref={wrapRef} className="relative min-w-0 flex-none">
       <button
         ref={triggerRef}
         type="button"
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
         title={disabled ? 'Set OpenRouter key first' : `Choose ${theme.label.toLowerCase()} model`}
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
+        className={`inline-flex max-w-[180px] items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition sm:max-w-[220px] ${
           open
             ? `bg-white ${theme.text} ${theme.ring} shadow-sm`
             : selectedId
@@ -229,7 +229,7 @@ export function ModelPicker({ modality }: Props) {
         >
           <path d="M12 2l2.39 4.84L20 8l-4 3.9.94 5.48L12 14.77l-4.94 2.6L8 11.9 4 8l5.61-1.16L12 2z" />
         </svg>
-        <span className="max-w-[140px] truncate">{pillLabel}</span>
+        <span className="min-w-0 truncate">{pillLabel}</span>
         {!selectedId && (
           <span className="text-[9.5px] text-neutral-400">· default</span>
         )}
@@ -249,7 +249,7 @@ export function ModelPicker({ modality }: Props) {
 
       {/* Popover */}
       <div
-        className={`absolute right-0 bottom-full mb-2 z-[400] w-[360px] origin-bottom-right rounded-xl border border-neutral-200/80 bg-white/95 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.22)] backdrop-blur-md transition duration-150 ease-out ${
+        className={`absolute right-0 bottom-full mb-2 z-[400] w-[min(360px,calc(100vw-24px))] origin-bottom-right rounded-xl border border-neutral-200/80 bg-white/95 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.22)] backdrop-blur-md transition duration-150 ease-out ${
           open
             ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
             : 'pointer-events-none translate-y-1 scale-95 opacity-0'

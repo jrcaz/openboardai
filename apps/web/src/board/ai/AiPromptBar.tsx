@@ -332,17 +332,17 @@ export function AiPromptBar({ boardId, editor }: Props) {
       <div
         aria-hidden={collapsed}
         inert={collapsed}
-        className={`pointer-events-auto flex w-[min(720px,90vw)] flex-col gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.18)] backdrop-blur transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`pointer-events-auto flex w-[min(880px,calc(100vw-24px))] flex-col gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.18)] backdrop-blur transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           collapsed
             ? 'pointer-events-none translate-y-3 scale-[0.96] opacity-0'
             : 'translate-y-0 scale-100 opacity-100'
         }`}
       >
         {/* Top strip: Mode toggle + (selection or aspect chips) + model picker */}
-        <div className="flex items-center justify-between gap-2 px-1 pt-0.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 pt-0.5">
           <ModeToggle mode={mode} onChange={setMode} />
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5">
             {mode === 'image' ? (
               <AspectPicker value={aspect} onChange={setAspect} />
             ) : mode === 'video' ? (
@@ -476,10 +476,10 @@ export function AiPromptBar({ boardId, editor }: Props) {
 
 function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   return (
-    <div className="inline-flex items-center rounded-full bg-neutral-100 p-0.5 text-[11px] font-medium">
+    <div className="inline-flex flex-none items-center rounded-full bg-neutral-100 p-0.5 text-[11px] font-medium">
       <button
         onClick={() => onChange('text')}
-        className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
+        className={`flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 transition ${
           mode === 'text'
             ? 'bg-white text-amber-700 shadow-sm'
             : 'text-neutral-500 hover:text-neutral-700'
@@ -492,7 +492,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
       </button>
       <button
         onClick={() => onChange('image')}
-        className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
+        className={`flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 transition ${
           mode === 'image'
             ? 'bg-white text-orange-700 shadow-sm'
             : 'text-neutral-500 hover:text-neutral-700'
@@ -507,7 +507,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
       </button>
       <button
         onClick={() => onChange('video')}
-        className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
+        className={`flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 transition ${
           mode === 'video'
             ? 'bg-white text-amber-900 shadow-sm'
             : 'text-neutral-500 hover:text-neutral-700'
@@ -531,7 +531,7 @@ function VideoAspectPicker({
   onChange: (a: VideoAspect) => void
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-full bg-neutral-50 p-0.5 text-[10.5px] font-medium ring-1 ring-neutral-200/60">
+    <div className="inline-flex flex-none items-center gap-1 rounded-full bg-neutral-50 p-0.5 text-[10.5px] font-medium ring-1 ring-neutral-200/60">
       {VIDEO_ASPECTS.map((a) => {
         const active = a.value === value
         return (
@@ -539,7 +539,7 @@ function VideoAspectPicker({
             key={a.value}
             onClick={() => onChange(a.value)}
             title={`${a.label} (${a.value})`}
-            className={`flex items-center gap-1 rounded-full px-2 py-0.5 transition ${
+            className={`flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 transition ${
               active
                 ? 'bg-white text-amber-900 shadow-sm ring-1 ring-amber-200'
                 : 'text-neutral-500 hover:text-neutral-700'
@@ -565,7 +565,7 @@ function AudioToggle({
     <button
       onClick={() => onChange(!value)}
       title={value ? 'Audio on' : 'Audio off'}
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
+      className={`inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
         value
           ? 'bg-white text-amber-900 ring-amber-300 shadow-sm'
           : 'bg-neutral-50 text-neutral-500 ring-neutral-200/60 hover:text-neutral-700'
@@ -608,7 +608,7 @@ function AutoConnectToggle({
           : "Don't auto-connect arrows"
       }
       aria-pressed={value}
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
+      className={`inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1 transition ${
         value
           ? 'bg-white text-amber-900 ring-amber-300 shadow-sm'
           : 'bg-neutral-50 text-neutral-500 ring-neutral-200/60 hover:text-neutral-700'
@@ -640,7 +640,7 @@ function AspectPicker({
   onChange: (a: ImageAspect) => void
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-full bg-neutral-50 p-0.5 text-[10.5px] font-medium ring-1 ring-neutral-200/60">
+    <div className="inline-flex flex-none items-center gap-1 rounded-full bg-neutral-50 p-0.5 text-[10.5px] font-medium ring-1 ring-neutral-200/60">
       {ASPECTS.map((a) => {
         const active = a.value === value
         return (
@@ -648,7 +648,7 @@ function AspectPicker({
             key={a.value}
             onClick={() => onChange(a.value)}
             title={`${a.label} (${a.value})`}
-            className={`flex items-center gap-1 rounded-full px-2 py-0.5 transition ${
+            className={`flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 transition ${
               active
                 ? 'bg-white text-orange-700 shadow-sm ring-1 ring-orange-100'
                 : 'text-neutral-500 hover:text-neutral-700'
@@ -676,7 +676,7 @@ function ImportHtmlButton({
       disabled={disabled}
       onClick={onPick}
       title="Import an HTML file onto the canvas"
-      className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10.5px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 transition hover:bg-white hover:text-violet-700 hover:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-neutral-50 px-2 py-0.5 text-[10.5px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 transition hover:bg-white hover:text-violet-700 hover:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <svg
         className="h-2.5 w-2.5"
@@ -691,7 +691,7 @@ function ImportHtmlButton({
         <path d="M16 7l4 5-4 5" />
         <path d="M14 4l-4 16" />
       </svg>
-      Import HTML
+      <span><span className="hidden sm:inline">Import </span>HTML</span>
     </button>
   )
 }
@@ -709,7 +709,7 @@ function CollapseButton({
       onClick={onClick}
       title={`Hide input bar (${modKey}\\)`}
       aria-label="Hide AI input bar"
-      className="group inline-flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 active:scale-90"
+      className="group inline-flex h-6 w-6 flex-none items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 active:scale-90"
     >
       <svg
         className="h-3 w-3 transition-transform group-hover:translate-y-0.5"
