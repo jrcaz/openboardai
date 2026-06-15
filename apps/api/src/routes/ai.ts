@@ -286,7 +286,7 @@ ai.post('/generate', zValidator('json', GenerateRequest), async (c) => {
     },
   })
 
-  return result.toUIMessageStreamResponse()
+  return result.toUIMessageStreamResponse({ sendSources: true })
 })
 
 ai.post('/generate-html', zValidator('json', GenerateHtmlRequest), async (c) => {
