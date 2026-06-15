@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { type Editor, createShapeId, type TLShape, type TLShapeId } from 'tldraw'
 import type { AiContextShape, ChatMessage, GenerateRequest } from '@openboard-ai/shared'
-import { AI_CARD_TYPE, type AiCardShape } from '../shapes/AiCardShapeUtil'
+import { AI_CARD_TYPE, type AiCardShape, type AiCitation } from '../shapes/AiCardShapeUtil'
 import {
   AI_HTML_TYPE,
   type AiHtmlShape,
@@ -88,6 +88,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
               text: '',
               status: 'pending',
               sourceShapeIds: sourceIds,
+              citations: [],
             },
           })
         })
@@ -105,6 +106,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
               text: '',
               status: 'pending',
               sourceShapeIds: sourceIds,
+              citations: [],
               title: null,
             },
           })
@@ -181,6 +183,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
         // `data: <json>\n\n`). Parse it ourselves rather than pulling
         // in another helper — we only need a handful of event types.
         let acc = ''
+        const citations: AiCitation[] = []
         for await (const chunk of iterateUIMessageChunks(res.body)) {
           if (chunk.type === 'text-delta' && typeof chunk.delta === 'string') {
             acc += chunk.delta
@@ -192,8 +195,34 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
                   props: {
                     text: acc,
                     status: 'streaming',
+                    citations: [...citations],
                     h: Math.min(800, Math.max(h, estimateHeight(acc, w))),
                   },
+                })
+              },
+              { history: 'ignore' },
+            )
+            continue
+          }
+
+          if (
+            chunk.type === 'source-url' &&
+            typeof chunk.sourceId === 'string' &&
+            typeof chunk.url === 'string'
+          ) {
+            upsertCitation(citations, {
+              sourceId: chunk.sourceId,
+              url: chunk.url,
+              ...(typeof chunk.title === 'string' && chunk.title.trim()
+                ? { title: chunk.title.trim() }
+                : {}),
+            })
+            editor.run(
+              () => {
+                updateCustomShape<AiCardShape>(editor, {
+                  id: cardId,
+                  type: AI_CARD_TYPE,
+                  props: { citations: [...citations] },
                 })
               },
               { history: 'ignore' },
@@ -403,7 +432,7 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
             updateCustomShape<AiCardShape>(editor, {
               id: cardId,
               type: AI_CARD_TYPE,
-              props: { text: acc, status: 'done' },
+              props: { text: acc, status: 'done', citations: [...citations] },
             })
           },
           { history: 'ignore' },
@@ -440,6 +469,9 @@ export function useAiGenerate(boardId: string, editor: Editor | null) {
 type UIMessageChunk = {
   type: string
   delta?: string
+  sourceId?: string
+  url?: string
+  title?: string
   toolCallId?: string
   toolName?: string
   input?: unknown
@@ -485,6 +517,17 @@ async function* iterateUIMessageChunks(
       }
     }
     if (done) break
+  }
+}
+
+function upsertCitation(citations: AiCitation[], next: AiCitation) {
+  const existing = citations.findIndex(
+    (citation) => citation.sourceId === next.sourceId || citation.url === next.url,
+  )
+  if (existing >= 0) {
+    citations[existing] = { ...citations[existing], ...next }
+  } else {
+    citations.push(next)
   }
 }
 
