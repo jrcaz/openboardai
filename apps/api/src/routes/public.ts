@@ -56,42 +56,93 @@ publicBoards.get('/boards/:token', async (c) => {
   return c.json(body)
 })
 
-publicBoards.get('/images/:id', async (c) => {
-  const id = c.req.param('id')
+async function publicImageResponse(id: string, token: string | null = null) {
   const [row] = await db
     .select({ bytes: schema.aiImages.bytes, mediaType: schema.aiImages.mediaType })
     .from(schema.aiImages)
     .innerJoin(schema.boards, eq(schema.aiImages.boardId, schema.boards.id))
-    .where(and(eq(schema.aiImages.id, id), eq(schema.boards.isPublic, true)))
+    .where(
+      token === null
+        ? and(eq(schema.aiImages.id, id), eq(schema.boards.isPublic, true))
+        : and(
+            eq(schema.aiImages.id, id),
+            eq(schema.boards.shareToken, token),
+            eq(schema.boards.isPublic, true),
+          ),
+    )
     .limit(1)
-  if (!row) return c.notFound()
+  if (!row) return null
   return bytesResponse(row.bytes as Buffer, row.mediaType)
-})
+}
 
-publicBoards.get('/videos/:id', async (c) => {
-  const id = c.req.param('id')
+async function publicVideoResponse(id: string, token: string | null = null) {
   const [row] = await db
     .select({ bytes: schema.aiVideos.bytes, mediaType: schema.aiVideos.mediaType })
     .from(schema.aiVideos)
     .innerJoin(schema.boards, eq(schema.aiVideos.boardId, schema.boards.id))
-    .where(and(eq(schema.aiVideos.id, id), eq(schema.boards.isPublic, true)))
+    .where(
+      token === null
+        ? and(eq(schema.aiVideos.id, id), eq(schema.boards.isPublic, true))
+        : and(
+            eq(schema.aiVideos.id, id),
+            eq(schema.boards.shareToken, token),
+            eq(schema.boards.isPublic, true),
+          ),
+    )
     .limit(1)
-  if (!row) return c.notFound()
+  if (!row) return null
   return bytesResponse(row.bytes as Buffer, row.mediaType, { 'accept-ranges': 'bytes' })
-})
+}
 
-publicBoards.get('/htmls/:id', async (c) => {
-  const id = c.req.param('id')
+async function publicHtmlResponse(id: string, token: string | null = null) {
   const [row] = await db
     .select({ bytes: schema.aiHtmls.bytes })
     .from(schema.aiHtmls)
     .innerJoin(schema.boards, eq(schema.aiHtmls.boardId, schema.boards.id))
-    .where(and(eq(schema.aiHtmls.id, id), eq(schema.boards.isPublic, true)))
+    .where(
+      token === null
+        ? and(eq(schema.aiHtmls.id, id), eq(schema.boards.isPublic, true))
+        : and(
+            eq(schema.aiHtmls.id, id),
+            eq(schema.boards.shareToken, token),
+            eq(schema.boards.isPublic, true),
+          ),
+    )
     .limit(1)
-  if (!row) return c.notFound()
+  if (!row) return null
   return bytesResponse(row.bytes as Buffer, 'text/html; charset=utf-8', {
     'content-security-policy': HTML_CSP,
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'no-referrer',
   })
+}
+
+publicBoards.get('/boards/:token/images/:id', async (c) => {
+  const res = await publicImageResponse(c.req.param('id'), c.req.param('token'))
+  return res ?? c.notFound()
+})
+
+publicBoards.get('/boards/:token/videos/:id', async (c) => {
+  const res = await publicVideoResponse(c.req.param('id'), c.req.param('token'))
+  return res ?? c.notFound()
+})
+
+publicBoards.get('/boards/:token/htmls/:id', async (c) => {
+  const res = await publicHtmlResponse(c.req.param('id'), c.req.param('token'))
+  return res ?? c.notFound()
+})
+
+publicBoards.get('/images/:id', async (c) => {
+  const res = await publicImageResponse(c.req.param('id'))
+  return res ?? c.notFound()
+})
+
+publicBoards.get('/videos/:id', async (c) => {
+  const res = await publicVideoResponse(c.req.param('id'))
+  return res ?? c.notFound()
+})
+
+publicBoards.get('/htmls/:id', async (c) => {
+  const res = await publicHtmlResponse(c.req.param('id'))
+  return res ?? c.notFound()
 })

@@ -45,7 +45,9 @@ export const api = {
 
   // Anonymous, read-only fetch of a publicly shared board by its share token.
   getPublicBoard: (token: string) =>
-    fetch(`/api/public/boards/${token}`).then((r) => json<PublicBoardResponse>(r)),
+    fetch(`/api/public/boards/${encodeURIComponent(token)}`).then((r) =>
+      json<PublicBoardResponse>(r),
+    ),
 
   // Toggle public sharing on/off. Enabling mints a share token if absent.
   setBoardPublic: (id: string, isPublic: boolean) =>
