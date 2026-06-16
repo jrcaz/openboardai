@@ -4,7 +4,7 @@ import { Tldraw, type Editor, type TLStoreSnapshot } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { api } from '../lib/api'
 import { customShapeUtils } from './shapes/customShapeUtils'
-import { AssetBaseProvider } from './assetBase'
+import { AssetBaseProvider, publicBoardAssetBase } from './assetBase'
 import { PublicBadge } from './PublicBadge'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
@@ -76,7 +76,7 @@ export function PublicBoardViewer() {
   }
 
   return (
-    <AssetBaseProvider base="/api/public">
+    <AssetBaseProvider base={publicBoardAssetBase(token)}>
       <div className="app-shell">
         <Tldraw
           shapeUtils={customShapeUtils}
