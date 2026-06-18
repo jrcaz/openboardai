@@ -5,9 +5,14 @@ import {
   Tldraw,
   TldrawUiMenuItem,
   type Editor,
+  type TLCamera,
+  type TLCameraOptions,
   type TLFrameShape,
-  type TLShapeId,
   type TLComponents,
+  type TLImageShape,
+  type TLRecord,
+  type TLShape,
+  type TLShapeId,
   type TLStoreSnapshot,
   type TLUiAssetUrlOverrides,
   type TLUiOverrides,
@@ -43,6 +48,7 @@ import { FileMenu } from './FileMenu'
 import { BoardLoading } from './BoardLoading'
 import { ShareButton } from './ShareButton'
 import { ProjectsSidebar } from './ProjectsSidebar'
+import { createBoardAssetStore } from './boardAssetStore'
 
 const customTools = [SpreadsheetShapeTool]
 
@@ -86,6 +92,13 @@ const baseComponents: TLComponents = {
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
+type ImageAnnotationSession = {
+  imageId: TLShapeId
+  wasLocked: boolean
+  camera: TLCamera
+  cameraOptions: TLCameraOptions
+}
+
 // Maps an HTTP status (parsed out of `lib/api.ts`'s "HTTP <code>: <body>"
 // error string) to a short message we can render in the share popover.
 function friendlyShareError(err: unknown, fallback: string): string {
@@ -107,6 +120,8 @@ interface Props {
 export function BoardEditor({ boardId }: Props) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [isPresenting, setIsPresenting] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<TLImageShape | null>(null)
+  const [annotationSession, setAnnotationSession] = useState<ImageAnnotationSession | null>(null)
   const [presentationFrameId, setPresentationFrameId] = useState<TLShapeId | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [boardTitle, setBoardTitle] = useState('Untitled')
@@ -233,7 +248,7 @@ export function BoardEditor({ boardId }: Props) {
         }, 1500)
       }
 
-      const unlisten = ed.store.listen(scheduleSave, { source: 'user', scope: 'document' })
+      const unlisten = ed.store.listen(scheduleSave, { source: 'all', scope: 'document' })
       // Save on unload too — debounce may be in flight.
       const flush = () => {
         if (saveTimerRef.current != null) {
@@ -259,6 +274,121 @@ export function BoardEditor({ boardId }: Props) {
     },
     [boardId],
   )
+
+  useEffect(() => {
+    if (!editor) {
+      setSelectedImage(null)
+      return
+    }
+    const updateSelection = () => {
+      const selected = editor.getSelectedShapes()
+      setSelectedImage(
+        selected.length === 1 && selected[0]?.type === 'image'
+          ? (selected[0] as TLImageShape)
+          : null,
+      )
+    }
+    updateSelection()
+    return editor.store.listen(updateSelection, { source: 'all', scope: 'session' })
+  }, [editor])
+
+  const annotationShapeIdsRef = useRef(new Set<TLShapeId>())
+
+  useEffect(() => {
+    if (!editor || !annotationSession) return
+    annotationShapeIdsRef.current = new Set()
+    const unlisten = editor.store.listen(
+      (entry) => {
+        for (const record of Object.values(entry.changes.added) as TLRecord[]) {
+          if (record.typeName !== 'shape') continue
+          const shape = record as TLShape
+          if (shape.id !== annotationSession.imageId && shape.type !== 'group') {
+            annotationShapeIdsRef.current.add(shape.id)
+          }
+        }
+      },
+      { source: 'user', scope: 'document' },
+    )
+    return unlisten
+  }, [annotationSession, editor])
+
+  const startImageAnnotation = useCallback(() => {
+    if (!editor || !selectedImage || annotationSession) return
+    const bounds = editor.getShapePageBounds(selectedImage.id)
+    if (!bounds) return
+
+    const camera = editor.getCamera()
+    const cameraOptions = editor.getCameraOptions()
+    setAnnotationSession({
+      imageId: selectedImage.id,
+      wasLocked: selectedImage.isLocked,
+      camera,
+      cameraOptions,
+    })
+
+    editor.run(
+      () => {
+        editor.updateShape<TLImageShape>({ id: selectedImage.id, type: 'image', isLocked: true })
+        editor.selectNone()
+        editor.setCurrentTool('draw')
+        editor.setCameraOptions({
+          ...cameraOptions,
+          constraints: {
+            bounds: { x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h },
+            padding: { x: 96, y: 96 },
+            origin: { x: 0.5, y: 0.5 },
+            initialZoom: 'fit-max-100',
+            baseZoom: 'fit-max-100',
+            behavior: 'contain',
+          },
+        })
+        editor.zoomToBounds(bounds, { inset: 96, animation: { duration: 180 } })
+      },
+      { ignoreShapeLock: true },
+    )
+  }, [annotationSession, editor, selectedImage])
+
+  const finishImageAnnotation = useCallback(
+    (group: boolean) => {
+      if (!editor || !annotationSession) return
+      const image = editor.getShape(annotationSession.imageId) as TLImageShape | undefined
+      const annotationIds = [...annotationShapeIdsRef.current].filter((id) => editor.getShape(id))
+
+      editor.run(
+        () => {
+          if (image) {
+            editor.updateShape<TLImageShape>({
+              id: annotationSession.imageId,
+              type: 'image',
+              isLocked: annotationSession.wasLocked,
+            })
+          }
+          editor.setCameraOptions(annotationSession.cameraOptions)
+          editor.setCamera(annotationSession.camera, { force: true })
+          editor.setCurrentTool('select')
+          if (group && image && annotationIds.length > 0) {
+            editor.groupShapes([annotationSession.imageId, ...annotationIds], { select: true })
+          } else if (image) {
+            editor.select(annotationSession.imageId)
+          }
+        },
+        { ignoreShapeLock: true },
+      )
+      annotationShapeIdsRef.current = new Set()
+      setAnnotationSession(null)
+    },
+    [annotationSession, editor],
+  )
+
+  useEffect(() => {
+    if (!annotationSession) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      finishImageAnnotation(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [annotationSession, finishImageAnnotation])
 
   // Mirrors the current `boardId` prop so async share handlers below can detect
   // when the user has navigated to a different board mid-flight and skip
@@ -379,6 +509,7 @@ export function BoardEditor({ boardId }: Props) {
   })
 
   const { visible: toolsVisible, toggle: toggleTools } = useToolsVisible()
+  const assetStore = useMemo(() => createBoardAssetStore(boardId), [boardId])
 
   const editorComponents = useMemo<TLComponents>(
     () => ({
@@ -450,6 +581,7 @@ export function BoardEditor({ boardId }: Props) {
         components={editorComponents}
         assetUrls={assetUrls}
         snapshot={initialSnapshotRef.current ?? undefined}
+        assets={assetStore}
         onMount={handleMount}
         licenseKey={TLDRAW_LICENSE_KEY || undefined}
       />
@@ -478,6 +610,45 @@ export function BoardEditor({ boardId }: Props) {
         />
       </div>
       <LaserCursor editor={editor} />
+      {!isPresenting && !annotationSession && selectedImage && (
+        <div className="pointer-events-auto absolute left-1/2 top-24 z-[520] -translate-x-1/2 sm:top-16">
+          <button
+            type="button"
+            title="Annotate image"
+            onClick={startImageAnnotation}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 text-[12px] font-semibold text-neutral-800 shadow-lg transition hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-amber-300"
+          >
+            <PencilIcon />
+            <span>Annotate image</span>
+          </button>
+        </div>
+      )}
+      {!isPresenting && annotationSession && (
+        <div className="pointer-events-auto absolute left-1/2 top-20 z-[620] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-2 rounded-lg border border-amber-200 bg-white/95 px-2 py-1.5 shadow-lg backdrop-blur sm:top-4">
+          <div className="flex items-center gap-2 px-2 text-[12px] font-medium text-neutral-700">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            Image annotation
+          </div>
+          <button
+            type="button"
+            title="Cancel image annotation"
+            onClick={() => finishImageAnnotation(false)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 text-[12px] font-semibold text-neutral-700 transition hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-amber-300"
+          >
+            <XIcon />
+            <span>Cancel</span>
+          </button>
+          <button
+            type="button"
+            title="Done annotating image"
+            onClick={() => finishImageAnnotation(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-2.5 text-[12px] font-semibold text-white transition hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-300"
+          >
+            <CheckIcon />
+            <span>Done</span>
+          </button>
+        </div>
+      )}
       <SlideshowControls
         editor={editor}
         isPresenting={isPresenting}
@@ -494,6 +665,64 @@ export function BoardEditor({ boardId }: Props) {
         <AiPromptBar boardId={boardId} editor={editor} />
       </div>
     </div>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
+function XIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   )
 }
 

@@ -9,6 +9,7 @@ import {
 } from 'tldraw'
 import type { BoardShapeIndexEntry } from '@openboard-ai/shared'
 import { sheetToText } from '../shapes/spreadsheet/formula'
+import { getOpenBoardAssetRef } from '../boardAssetStore'
 
 // tldraw's `toRichText` helper lives in @tldraw/tlschema and is NOT re-exported
 // by the top-level `tldraw` barrel (our only tldraw dependency), so we inline
@@ -175,6 +176,13 @@ export function extractImageRef(
     if (!asset) return undefined
     const aprops = asset.props as { src?: string | null; mimeType?: string | null }
     if (!aprops.src) return undefined
+    const stored = getOpenBoardAssetRef(asset)
+    if (stored?.kind === 'image') {
+      return {
+        imageId: stored.id,
+        ...(aprops.mimeType ? { mediaType: aprops.mimeType } : {}),
+      }
+    }
     return {
       dataUrl: aprops.src,
       ...(aprops.mimeType ? { mediaType: aprops.mimeType } : {}),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'wouter'
 import { Tldraw, type Editor, type TLStoreSnapshot } from 'tldraw'
 import 'tldraw/tldraw.css'
@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { customShapeUtils } from './shapes/customShapeUtils'
 import { AssetBaseProvider, publicBoardAssetBase } from './assetBase'
 import { PublicBadge } from './PublicBadge'
+import { createReadonlyBoardAssetStore } from './boardAssetStore'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
@@ -18,6 +19,7 @@ export function PublicBoardViewer() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const snapshotRef = useRef<TLStoreSnapshot | null>(null)
   const [, forceMount] = useState(0)
+  const assetStore = useMemo(() => createReadonlyBoardAssetStore('/api/public'), [])
 
   useEffect(() => {
     let cancelled = false
@@ -81,6 +83,7 @@ export function PublicBoardViewer() {
         <Tldraw
           shapeUtils={customShapeUtils}
           snapshot={snapshotRef.current ?? undefined}
+          assets={assetStore}
           hideUi
           onMount={handleMount}
           licenseKey={TLDRAW_LICENSE_KEY || undefined}
