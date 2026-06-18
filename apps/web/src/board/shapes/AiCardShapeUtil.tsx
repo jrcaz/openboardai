@@ -161,7 +161,13 @@ function AiCardComponent({ shape, editor }: { shape: AiCardShape; editor: Editor
 
           <div className="flex-1 px-3 py-2 text-[13px] leading-snug text-neutral-800">
             {text ? (
-              <div className="ai-md break-words">
+              <div
+                className="ai-md cursor-text select-text break-words"
+                style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
+                onPointerDown={stopEventPropagation}
+                onMouseDown={stopEventPropagation}
+                onDoubleClick={stopEventPropagation}
+              >
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                   {linkifyCitationMarkers(text, citations)}
                 </ReactMarkdown>
