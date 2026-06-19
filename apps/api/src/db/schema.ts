@@ -82,6 +82,20 @@ export const boards = pgTable('boards', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+export const boardTemplates = pgTable('board_templates', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  sourceBoardId: text('source_board_id').references(() => boards.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull(),
+  isPublic: boolean('is_public').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 export const aiMessages = pgTable('ai_messages', {
   id: text('id').primaryKey(),
   boardId: text('board_id')

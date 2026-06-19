@@ -3,6 +3,8 @@ import type {
   BoardClaimStatus,
   BoardListResponse,
   BoardResponse,
+  BoardTemplateListResponse,
+  BoardTemplateSummary,
   CreatedApiKey,
   Modality,
   ModelsResponse,
@@ -36,6 +38,27 @@ export const api = {
 
   createBoard: (title?: string) =>
     fetch('/api/boards', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    }).then((r) => json<BoardResponse>(r)),
+
+  listTemplates: () => fetch('/api/templates').then((r) => json<BoardTemplateListResponse>(r)),
+
+  createTemplate: (req: {
+    boardId: string
+    title: string
+    description?: string
+    isPublic?: boolean
+  }) =>
+    fetch('/api/templates', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(req),
+    }).then((r) => json<BoardTemplateSummary>(r)),
+
+  createBoardFromTemplate: (templateId: string, title?: string) =>
+    fetch(`/api/templates/${templateId}/boards`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ title }),

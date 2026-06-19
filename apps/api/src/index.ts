@@ -23,6 +23,7 @@ import { mcp } from './routes/mcp.js'
 import { models } from './routes/models.js'
 import { publicBoards } from './routes/public.js'
 import { settings } from './routes/settings.js'
+import { templates } from './routes/templates.js'
 import { videos } from './routes/videos.js'
 
 const app = new Hono<AuthEnv>()
@@ -85,6 +86,7 @@ app.route('/api/htmls', htmls)
 app.route('/api/settings', settings)
 app.route('/api/models', models)
 app.route('/api/keys', keys)
+app.route('/api/templates', templates)
 
 const webDist = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 const indexHtmlPath = join(webDist, 'index.html')
